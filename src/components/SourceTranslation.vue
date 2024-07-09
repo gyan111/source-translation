@@ -71,11 +71,11 @@
         serviceInput: '',
         languages: [
           { code: 'en', name: 'English' },
-          { code: 'es', name: 'Spanish' },
-          { code: 'fr', name: 'French' },
-          { code: 'hi', name: 'Hindi' },
           { code: 'or', name: 'Odia' },
           { code: 'ta', name: 'Tamil' },
+          { code: 'pa', name: 'Punjabi' },
+          { code: 'bn', name: 'Bengali' },
+          { code: 'de', name: 'Germany' },
           // Add other languages as needed
         ],
         refs: [],
