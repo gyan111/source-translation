@@ -82,10 +82,11 @@
         serviceInput: '',
         languages: [
           { code: 'en', name: 'English' },
-          { code: 'es', name: 'Spanish' },
+          { code: 'bn', name: 'Bengali' },
           { code: 'fr', name: 'French' },
           { code: 'hi', name: 'Hindi' },
           { code: 'or', name: 'Odia' },
+          { code: 'pa', name: 'Panjabi' },
           { code: 'ta', name: 'Tamil' },
           // Add other languages as needed
         ],
