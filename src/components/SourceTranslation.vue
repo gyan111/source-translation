@@ -1,31 +1,33 @@
 <template>
     <div class="container mx-auto p-4 bg-white shadow-lg rounded-lg">
       <h1 class="text-2xl font-bold text-gray-800 mb-4 text-center">{{ mainTitle }}</h1>
-      <h1 class="text-1xl font-bold text-gray-800 mb-2 text-center">{{ subTitle }}</h1>
+      <h1 class="text-1xl font-bold text-gray-800 mb-2 text-center">{{ subTitle }}</h1> 
   
-      <div class="relative mb-4">
-        <div v-if="warningMessage" :class="['bg-red-100', 'border', 'border-red-400', 'text-red-700', 'px-4', 'py-3', 'rounded', 'absolute', 'w-full', 'transition-opacity', warningMessage ? 'opacity-100' : 'opacity-0']" role="alert">
-          <span class="block sm:inline">{{ warningMessage }}</span>
-        </div>
+      <div class="relative mb-4 mt-4">
+        <transition name="fade">
+          <div v-if="warningMessage" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded absolute w-full transition-opacity" role="alert">
+            <span class="block sm:inline">{{ warningMessage }}</span>
+          </div>
+        </transition>
       </div>
   
-      <div class="flex flex-col space-y-4 md:space-y-0 md:flex-row md:space-x-4">
+      <div class="flex flex-col space-y-4 md:space-y-0 mt-16 md:flex-row md:space-x-4">
         <!-- Left Box -->
         <div class="w-full md:w-1/2 bg-gray-200 p-4 rounded-lg shadow">
           <div class="flex flex-col space-y-2 md:flex-row md:items-center md:space-y-0 md:space-x-2 mb-4">
             <select v-model="fromLanguage" class="w-full md:w-auto px-2 py-2 border border-gray-300 rounded">
-              <option v-for="language in languages" :value="language.code">{{ language.name }}</option>
+              <option v-for="language in languages" :key="language.code" :value="language.code">{{ language.name }}</option>
             </select>
             <div class="relative w-full md:w-auto">
-              <input v-model="articleInput" @input="fetchSuggestions" :class="{'border-red-500': articleInputError}" type="text" class="w-full md:w-auto px-2 py-2 border border-gray-300 rounded" placeholder="Article">
+              <input v-model="articleInput" @input="debouncedFetchSuggestions" :class="{'border-red-500': articleInputError}" type="text" class="w-full md:w-auto px-2 py-2 border border-gray-300 rounded" placeholder="Article">
               <ul v-if="suggestions.length" class="absolute bg-white border border-gray-300 rounded mt-1 w-full max-h-60 overflow-y-auto">
-                <li v-for="suggestion in suggestions" @click="selectSuggestion(suggestion)" class="px-2 py-1 cursor-pointer hover:bg-gray-200">{{ suggestion }}</li>
+                <li v-for="suggestion in suggestions" :key="suggestion" @click="selectSuggestion(suggestion)" class="px-2 py-1 cursor-pointer hover:bg-gray-200">{{ suggestion }}</li>
               </ul>
             </div>
             <button @click="getArticleAction" class="w-full md:w-auto px-4 py-2 bg-blue-500 text-white font-semibold rounded">{{ getArticleButtonText }}</button>
             <select v-model="toLanguage" :class="{'border-red-500': toLanguageError}" class="w-full md:w-auto px-2 py-2 border border-gray-300 rounded">
               <option value="" disabled>To</option>
-              <option v-for="language in languages" :value="language.code">{{ language.name }}</option>
+              <option v-for="language in languages" :key="language.code" :value="language.code">{{ language.name }}</option>
             </select>
             <select v-model="translationService" class="w-full md:w-auto px-2 py-2 border border-gray-300 rounded md:hidden">
               <option value="mint">Mint Wikimedia</option>
@@ -51,10 +53,19 @@
           <textarea v-model="rightTextarea" class="w-full p-4 border border-gray-300 rounded" rows="8" placeholder="Translated text will appear here..."></textarea>
         </div>
       </div>
+  
+      <!-- Progress Bar -->
+      <div v-if="showProgressBar" class="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-opacity-50 bg-gray-500">
+        <div class="w-1/2 bg-gray-300 rounded-full">
+          <div class="bg-blue-500 text-xs leading-none py-1 text-center text-white rounded-full" :style="{ width: progressBarWidth + '%' }">Translating...</div>
+        </div>
+      </div>
     </div>
   </template>
   
   <script>
+  import debounce from 'lodash/debounce';
+  
   export default {
     data() {
       return {
@@ -71,11 +82,11 @@
         serviceInput: '',
         languages: [
           { code: 'en', name: 'English' },
+          { code: 'es', name: 'Spanish' },
+          { code: 'fr', name: 'French' },
+          { code: 'hi', name: 'Hindi' },
           { code: 'or', name: 'Odia' },
           { code: 'ta', name: 'Tamil' },
-          { code: 'pa', name: 'Punjabi' },
-          { code: 'bn', name: 'Bengali' },
-          { code: 'de', name: 'Germany' },
           // Add other languages as needed
         ],
         refs: [],
@@ -84,7 +95,9 @@
         articleInputError: false,
         leftTextareaError: false,
         toLanguageError: false,
-        warningMessage: ''
+        warningMessage: '',
+        showProgressBar: false, // New property to control progress bar visibility
+        progressBarWidth: 0 // New property to control progress bar width
       }
     },
     computed: {
@@ -99,6 +112,9 @@
           this.warningMessage = '';
         }, 3000);
       },
+      debouncedFetchSuggestions: debounce(function() {
+        this.fetchSuggestions();
+      }, 300),
       async fetchSuggestions() {
         if (this.articleInput.length > 2) {
           const url = `https://${this.fromLanguage}.wikipedia.org/w/api.php?action=opensearch&search=${this.articleInput}&limit=10&namespace=0&format=json&origin=*`;
@@ -148,7 +164,7 @@
       async translateAction() {
         if (!this.leftTextarea) {
           this.leftTextareaError = true;
-          this.showWarning('Left textarea is empty. Please fetch an article or paste source code first.');
+          this.showWarning('Left box is empty. Please fetch an article or paste source code first.');
           return;
         } else {
           this.leftTextareaError = false;
@@ -162,23 +178,41 @@
           this.toLanguageError = false;
         }
   
+        // Clear the right box immediately when the translate button is clicked
+        this.rightTextarea = '';
+  
+        // Show the progress bar
+        this.showProgressBar = true;
+        this.progressBarWidth = 0;
+  
         if (this.leftTextarea && this.toLanguage) {
           // Extract and translate links
-          const { nonLinkText, links } = this.extractLinks(this.leftTextarea);
+          let { nonLinkText, links } = this.extractLinks(this.leftTextarea);
           this.links = links;
   
-          // Translate the full links using Wikidata
-          const fullLinkTranslations = await this.translateFullLinks(links.map(link => link.fullLink), this.fromLanguage, this.toLanguage);
+          // Chunk the translation requests to avoid overloading
+          const chunkSize = 10; // Adjust chunk size as needed
+          const totalChunks = Math.ceil(links.length / chunkSize);
   
-          let textWithTranslatedLinks = nonLinkText;
-          links.forEach((link, index) => {
-            const translatedFullLink = fullLinkTranslations[link.fullLink] || link.fullLink;
-            const linkPlaceholder = `LINK_PLACEHOLDER_${index}`;
-            textWithTranslatedLinks = textWithTranslatedLinks.replace(linkPlaceholder, link.hasPipe ? `[[${translatedFullLink}|${link.afterPipe}]]` : `[[${translatedFullLink}]]`);
-          });
+          for (let i = 0; i < totalChunks; i++) {
+            const chunk = links.slice(i * chunkSize, (i + 1) * chunkSize);
+            const fullLinkTranslations = await this.translateFullLinks(chunk.map(link => link.fullLink), this.fromLanguage, this.toLanguage);
   
-          this.rightTextarea = textWithTranslatedLinks;
+            chunk.forEach((link, index) => {
+              const translatedFullLink = fullLinkTranslations[link.fullLink] || link.fullLink;
+              const linkPlaceholder = `LINK_PLACEHOLDER_${i * chunkSize + index}`;
+              nonLinkText = nonLinkText.replace(linkPlaceholder, link.hasPipe ? `[[${translatedFullLink}|${link.afterPipe}]]` : `[[${translatedFullLink}]]`);
+            });
+  
+            // Update the progress bar
+            this.progressBarWidth = ((i + 1) / totalChunks) * 100;
+          }
+  
+          this.rightTextarea = nonLinkText;
         }
+  
+        // Hide the progress bar after translation is done
+        this.showProgressBar = false;
       },
       extractLinks(wikitext) {
         const regex = /\[\[(.*?)(\|.*?)?\]\]/g;
@@ -273,6 +307,12 @@
   <style scoped>
   .transition-opacity {
     transition: opacity 0.5s ease-in-out;
+  }
+  .fade-enter-active, .fade-leave-active {
+    transition: opacity 0.5s;
+  }
+  .fade-enter, .fade-leave-to /* .fade-leave-active in <2.1.8 */ {
+    opacity: 0;
   }
   </style>
   

@@ -1,16 +1,16 @@
 <template>
   <div id="app">
-    <TranslationTool />
+    <SourceTranslation />
   </div>
 </template>
 
 <script>
-import TranslationTool from './components/SourceTranslation.vue';
+import SourceTranslation from './components/SourceTranslation.vue';
 
 export default {
   name: 'App',
   components: {
-    TranslationTool
+    SourceTranslation
   }
 }
 </script>
