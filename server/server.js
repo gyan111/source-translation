@@ -4,7 +4,7 @@ import translateRoute from './routes/translate.js';
 import previewRoute from './routes/preview.js';
 
 const app = express();
-const PORT = parseInt(process.env.PORT, 10) || 5173;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 app.use(bodyParser.json());
 app.use(express.static('dist'));
