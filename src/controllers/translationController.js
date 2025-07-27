@@ -148,7 +148,6 @@ export const translate = async (req, res) => {
     // Translate templates and links with fallback to originals if they fail
     let translatedTemplates = templates;
     let translatedLinks = links;
-    let translatedText = cleanedText;
     
     try {
       translatedTemplates = await translateTemplates(templates, fromLanguage, toLanguage);
@@ -164,14 +163,10 @@ export const translate = async (req, res) => {
       // Continue with original links
     }
     
-    try {
-      translatedText = await translateTextUsingService(cleanedText, fromLanguage, toLanguage, translationService, apiKey);
-    } catch (textError) {
-      console.error('Failed to translate text:', textError.message);
-      // If text translation fails, we'll still return the document with translated templates/links if those worked
-    }
+    // Don't translate the regular text, just use the original cleaned text
+    const translatedText = cleanedText;
     
-    // Rebuild the text with whatever translations succeeded
+    // Rebuild the text with translated templates/links but original text content
     const rebuiltText = rebuildTextWithTemplatesAndLinks(translatedText, translatedTemplates, translatedLinks);
     res.json({ translatedText: rebuiltText });
   } catch (error) {
