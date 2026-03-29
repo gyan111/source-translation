@@ -13,7 +13,7 @@ const translateTextUsingService = async (text, fromLanguage, toLanguage, transla
         from: fromLanguage, 
         to: toLanguage, 
         apiKey,
-        timeout: 10000 // 10 second timeout
+        timeout: 20000 // 20 second timeout
       });
       return response.text;
     } else if (translationService === 'microsoft') {
@@ -26,15 +26,22 @@ const translateTextUsingService = async (text, fromLanguage, toLanguage, transla
         target_language: toLanguage,
         format: 'text'
       }, {
-        timeout: 10000 // 10 second timeout
+        timeout: 25000 // 25 second timeout for Mint API
       });
-      return response.data.translation;
+      if (response.data && response.data.translation) {
+        return response.data.translation;
+      }
+      return text;
     } else {
       console.warn(`Unsupported translation service: ${translationService}, using original text`);
-      return text; // Return original text instead of throwing
+      return text; 
     }
   } catch (error) {
-    console.error(`Translation service error (${translationService}):`, error.message);
+    console.error(`Translation service error (${translationService}) [${fromLanguage}->${toLanguage}]:`, error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
     // Return original text if translation fails
     return text;
   }
@@ -83,6 +90,9 @@ const translateTemplates = async (templates, fromLanguage, toLanguage) => {
               format: 'json',
               origin: '*'
             },
+            headers: {
+              'User-Agent': 'SourceTranslationTool/1.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
+            },
             timeout: 5000 // 5 second timeout
           });
           const entities = response.data.entities;
@@ -117,6 +127,9 @@ const translateLinks = async (links, fromLanguage, toLanguage) => {
               props: 'sitelinks',
               format: 'json',
               origin: '*'
+            },
+            headers: {
+              'User-Agent': 'SourceTranslationTool/1.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
             },
             timeout: 5000 // 5 second timeout
           });
@@ -197,6 +210,9 @@ export const preview = async (req, res) => {
         origin: '*',
         text: text,
         uselang: language
+      },
+      headers: {
+        'User-Agent': 'SourceTranslationTool/1.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
       }
     });
     res.json({ html: response.data.parse.text['*'] });
