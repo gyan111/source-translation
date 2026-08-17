@@ -134,21 +134,36 @@ export const preview = async (req, res) => {
   }
 
   try {
-    const response = await axios.get(`https://${language}.wikipedia.org/w/api.php`, {
-      params: {
-        action: 'parse',
-        format: 'json',
-        prop: 'text',
-        contentmodel: 'wikitext',
-        origin: '*',
-        text: text,
-        uselang: language
-      },
-      headers: {
-        'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
-      }
+    const params = new URLSearchParams({
+      action: 'parse',
+      format: 'json',
+      prop: 'text',
+      contentmodel: 'wikitext',
+      text: text,
+      uselang: language,
     });
-    res.json({ html: response.data.parse.text['*'] });
+
+    const response = await axios.post(
+      `https://${language}.wikipedia.org/w/api.php`,
+      params.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
+        },
+      }
+    );
+
+    if (response.data?.parse?.text?.['*']) {
+      res.json({ html: response.data.parse.text['*'] });
+    } else if (response.data?.error) {
+      res.status(400).json({
+        error: 'MediaWiki Parse Error',
+        message: response.data.error.info || 'Unknown MediaWiki error',
+      });
+    } else {
+      res.json({ html: '<p class="text-zinc-400 italic">No content rendered.</p>' });
+    }
   } catch (error) {
     console.error('Error generating preview:', error.message);
     res.status(500).json({

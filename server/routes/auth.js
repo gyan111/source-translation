@@ -2,32 +2,32 @@ import express from 'express';
 
 const router = express.Router();
 
-// Wikimedia OAuth 2.0 configuration
-const OAUTH_CONFIG = {
+const getOAuthConfig = () => ({
   clientId: process.env.OAUTH_CONSUMER_KEY || '',
   clientSecret: process.env.OAUTH_CONSUMER_SECRET || '',
   authorizationUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/authorize',
   tokenUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/access_token',
   profileUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/resource/profile',
-  callbackUrl: process.env.OAUTH_CALLBACK_URL || 'http://localhost:3000/auth/callback',
-};
+  callbackUrl: process.env.OAUTH_CALLBACK_URL || 'http://localhost:8000/callback',
+});
 
 // Login - redirect to Wikimedia authorization
 router.get('/login', (req, res) => {
-  if (!OAUTH_CONFIG.clientId) {
+  const config = getOAuthConfig();
+  if (!config.clientId) {
     return res.status(500).json({
       error: 'OAuth not configured',
-      message: 'Set OAUTH_CONSUMER_KEY and OAUTH_CONSUMER_SECRET environment variables.',
+      message: 'Set OAUTH_CONSUMER_KEY and OAUTH_CONSUMER_SECRET in your .env file.',
     });
   }
 
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: OAUTH_CONFIG.clientId,
-    redirect_uri: OAUTH_CONFIG.callbackUrl,
+    client_id: config.clientId,
+    redirect_uri: config.callbackUrl,
   });
 
-  res.redirect(`${OAUTH_CONFIG.authorizationUrl}?${params.toString()}`);
+  res.redirect(`${config.authorizationUrl}?${params.toString()}`);
 });
 
 // Callback - exchange code for token
@@ -38,28 +38,30 @@ router.get('/callback', async (req, res) => {
     return res.status(400).send('Missing authorization code');
   }
 
+  const config = getOAuthConfig();
+
   try {
     // Exchange code for access token
-    const tokenResponse = await fetch(OAUTH_CONFIG.tokenUrl, {
+    const tokenResponse = await fetch(config.tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        client_id: OAUTH_CONFIG.clientId,
-        client_secret: OAUTH_CONFIG.clientSecret,
-        redirect_uri: OAUTH_CONFIG.callbackUrl,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: config.callbackUrl,
       }),
     });
 
     const tokenData = await tokenResponse.json();
 
     if (!tokenData.access_token) {
-      throw new Error('No access token received');
+      throw new Error('No access token received: ' + JSON.stringify(tokenData));
     }
 
     // Fetch user profile
-    const profileResponse = await fetch(OAUTH_CONFIG.profileUrl, {
+    const profileResponse = await fetch(config.profileUrl, {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
 

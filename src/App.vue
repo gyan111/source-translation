@@ -1,7 +1,9 @@
 <template>
-  <div :class="{ dark: isDark }" class="min-h-screen">
+  <div :class="{ dark: isDark }" class="min-h-screen flex flex-col bg-surface-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 transition-colors duration-300">
     <HeaderBar :isDark="isDark" :user="user" @toggle-dark-mode="toggleDarkMode" @update:user="user = $event" />
-    <SourceTranslation :user="user" />
+    <main class="flex-1 w-full">
+      <SourceTranslation :user="user" />
+    </main>
     <FooterBar />
   </div>
 </template>
