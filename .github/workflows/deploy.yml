@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -37,13 +37,23 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Trigger Build & Restart on Toolforge
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: login.toolforge.org
-          username: ${{ secrets.TOOLFORGE_SSH_USER }}
-          key: ${{ secrets.TOOLFORGE_SSH_KEY }}
-          script: |
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via Native SSH to Toolforge
+        env:
+          SSH_USER: ${{ secrets.TOOLFORGE_SSH_USER }}
+          SSH_KEY: ${{ secrets.TOOLFORGE_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H login.toolforge.org >> ~/.ssh/known_hosts
+          
+          eval $(ssh-agent -s)
+          echo "$SSH_KEY" | tr -d '\r' | ssh-add -
+          
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "${SSH_USER}@login.toolforge.org" << 'EOF'
+            set -e
             echo "Starting build on Toolforge..."
             become source-translation toolforge build start https://github.com/gyan111/source-translation
             
@@ -64,3 +74,4 @@ jobs:
             echo "Starting webservice with newly built container image..."
             become source-translation toolforge webservice --mount=none buildservice start || become source-translation toolforge webservice buildservice start
             echo "Source Translation deployment complete!"
+          EOF
