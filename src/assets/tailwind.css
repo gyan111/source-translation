@@ -4,19 +4,25 @@
 
 @layer base {
   * {
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
 
   body {
-    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950;
-    @apply text-slate-800 dark:text-slate-200;
-    @apply font-sans;
+    @apply bg-slate-50 text-slate-900 dark:bg-[#09090b] dark:text-zinc-100;
+    @apply font-sans antialiased;
+    background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.04) 0px, transparent 50%),
+                      radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.03) 0px, transparent 50%);
     min-height: 100vh;
     margin: 0;
   }
 
+  .dark body {
+    background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.06) 0px, transparent 50%),
+                      radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.04) 0px, transparent 50%);
+  }
+
   ::selection {
-    @apply bg-primary-500/30 text-primary-900 dark:text-primary-100;
+    @apply bg-primary-500/25 text-primary-900 dark:text-primary-200;
   }
 
   /* Custom scrollbar */
@@ -28,108 +34,103 @@
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+    @apply bg-slate-300 dark:bg-zinc-700/60 rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-500;
+    @apply bg-slate-400 dark:bg-zinc-600;
   }
 }
 
 @layer components {
   .glass {
-    @apply bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl;
-    @apply border border-white/20 dark:border-slate-700/50;
+    @apply bg-white/80 dark:bg-[#121215]/80 backdrop-blur-2xl;
+    @apply border border-slate-200/80 dark:border-white/[0.08];
   }
 
   .glass-strong {
-    @apply bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl;
-    @apply border border-white/30 dark:border-slate-700/60;
+    @apply bg-white/95 dark:bg-[#121215]/95 backdrop-blur-2xl;
+    @apply border border-slate-200 dark:border-white/[0.1];
   }
 
   .card-elevated {
-    @apply glass rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/50;
+    @apply glass rounded-2xl shadow-sm hover:shadow-md dark:shadow-none transition-shadow;
   }
 
   .btn-primary {
     @apply px-4 py-2.5 rounded-xl font-medium text-sm;
-    @apply bg-gradient-to-r from-primary-500 to-primary-600;
-    @apply hover:from-primary-600 hover:to-primary-700;
-    @apply text-white shadow-md shadow-primary-500/25;
-    @apply transition-all duration-200 hover:shadow-lg hover:shadow-primary-500/30;
+    @apply bg-primary-600 hover:bg-primary-500 active:bg-primary-700;
+    @apply text-white shadow-sm;
+    @apply transition-all duration-150;
     @apply active:scale-[0.98];
   }
 
   .btn-success {
     @apply px-4 py-2.5 rounded-xl font-medium text-sm;
-    @apply bg-gradient-to-r from-emerald-500 to-emerald-600;
-    @apply hover:from-emerald-600 hover:to-emerald-700;
-    @apply text-white shadow-md shadow-emerald-500/25;
-    @apply transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/30;
+    @apply bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700;
+    @apply text-white shadow-sm;
+    @apply transition-all duration-150;
     @apply active:scale-[0.98];
   }
 
   .btn-secondary {
-    @apply px-4 py-2.5 rounded-xl font-medium text-sm;
-    @apply bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200;
-    @apply hover:bg-slate-200 dark:hover:bg-slate-600;
-    @apply border border-slate-200 dark:border-slate-600;
-    @apply transition-all duration-200;
+    @apply px-3.5 py-2.5 rounded-xl font-medium text-sm;
+    @apply bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200;
+    @apply border border-slate-200 dark:border-white/[0.08];
+    @apply transition-all duration-150;
     @apply active:scale-[0.98];
   }
 
   .btn-warning {
     @apply px-4 py-2.5 rounded-xl font-medium text-sm;
-    @apply bg-gradient-to-r from-amber-500 to-orange-500;
-    @apply hover:from-amber-600 hover:to-orange-600;
-    @apply text-white shadow-md shadow-amber-500/25;
-    @apply transition-all duration-200 hover:shadow-lg hover:shadow-amber-500/30;
+    @apply bg-amber-600 hover:bg-amber-500 active:bg-amber-700;
+    @apply text-white shadow-sm;
+    @apply transition-all duration-150;
     @apply active:scale-[0.98];
   }
 
   .input-field {
-    @apply w-full px-3 py-2.5 rounded-xl text-sm;
-    @apply bg-white dark:bg-slate-700/50;
-    @apply border border-slate-200 dark:border-slate-600;
-    @apply text-slate-800 dark:text-slate-200;
-    @apply placeholder-slate-400 dark:placeholder-slate-500;
-    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500;
-    @apply transition-all duration-200;
+    @apply w-full px-3.5 py-2.5 rounded-xl text-sm;
+    @apply bg-white dark:bg-zinc-900/90;
+    @apply border border-slate-200 dark:border-white/[0.1];
+    @apply text-slate-900 dark:text-zinc-100;
+    @apply placeholder-slate-400 dark:placeholder-zinc-500;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500;
+    @apply transition-all duration-150;
   }
 
   .select-field {
     @apply input-field appearance-none cursor-pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
-    background-position: right 0.5rem center;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.6rem center;
     background-repeat: no-repeat;
-    background-size: 1.5em 1.5em;
-    padding-right: 2.5rem;
+    background-size: 1.25em 1.25em;
+    padding-right: 2.25rem;
   }
 
   .textarea-field {
     @apply w-full p-4 rounded-xl text-sm leading-relaxed resize-none;
-    @apply bg-white dark:bg-slate-700/50;
-    @apply border border-slate-200 dark:border-slate-600;
-    @apply text-slate-800 dark:text-slate-200;
-    @apply placeholder-slate-400 dark:placeholder-slate-500;
-    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500;
-    @apply transition-all duration-200;
+    @apply bg-white dark:bg-zinc-900/90;
+    @apply border border-slate-200 dark:border-white/[0.1];
+    @apply text-slate-900 dark:text-zinc-100;
+    @apply placeholder-slate-400 dark:placeholder-zinc-500;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500;
+    @apply transition-all duration-150;
   }
 
   .toast {
-    @apply fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-xl;
-    @apply animate-slide-down;
-    @apply text-sm font-medium;
+    @apply fixed top-4 left-4 right-4 sm:left-auto sm:right-4 z-50 px-4 sm:px-5 py-3 rounded-xl shadow-xl max-w-md mx-auto sm:mx-0;
+    @apply animate-slide-down text-sm font-medium;
   }
 
   .toast-error {
-    @apply toast bg-red-500 text-white;
+    @apply toast bg-red-600 text-white;
   }
 
   .toast-success {
-    @apply toast bg-emerald-500 text-white;
+    @apply toast bg-emerald-600 text-white;
   }
 
   .toast-warning {
-    @apply toast bg-amber-500 text-white;
+    @apply toast bg-amber-600 text-white;
   }
 }

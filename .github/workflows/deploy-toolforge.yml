@@ -1,0 +1,72 @@
+name: Deploy to Toolforge
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Create deployment tarball
+        run: tar -czf deploy.tar.gz dist/ server/ src/ package.json package-lock.json
+
+      - name: Transfer tarball to Toolforge via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: login.toolforge.org
+          username: ${{ secrets.TOOLFORGE_USERNAME }}
+          key: ${{ secrets.TOOLFORGE_PRIVATE_KEY }}
+          source: "deploy.tar.gz"
+          target: "/data/project/${{ secrets.TOOLFORGE_USERNAME }}/"
+
+      - name: Execute deployment commands via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: login.toolforge.org
+          username: ${{ secrets.TOOLFORGE_USERNAME }}
+          key: ${{ secrets.TOOLFORGE_PRIVATE_KEY }}
+          script: |
+            # Exit if any command fails
+            set -e
+            
+            # Switch to the tool account
+            become ${{ secrets.TOOLFORGE_TOOLNAME }} bash -c "
+              # Ensure standard nodejs directory structure exists
+              mkdir -p ~/www/js
+              cd ~/www/js
+              
+              # Move the archive from the user's home to the tool's directory
+              mv /data/project/${{ secrets.TOOLFORGE_USERNAME }}/deploy.tar.gz .
+              
+              # Extract the archive
+              tar -xzf deploy.tar.gz
+              rm deploy.tar.gz
+              
+              # Clean install production dependencies only
+              npm ci --omit=dev
+              
+              # Restart the webservice
+              webservice --backend=kubernetes nodejs18 restart
+            "

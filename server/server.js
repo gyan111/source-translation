@@ -4,11 +4,12 @@ import session from 'express-session';
 import translateRoute from './routes/translate.js';
 import previewRoute from './routes/preview.js';
 import authRoute from './routes/auth.js';
+import publishRoute from './routes/publish.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '5mb' }));
 
 // Session middleware for OAuth
 app.use(session({
@@ -26,5 +27,6 @@ app.use(express.static('dist'));
 app.use('/translate', translateRoute);
 app.use('/preview', previewRoute);
 app.use('/auth', authRoute);
+app.use('/publish', publishRoute);
 
 app.listen(PORT, () => console.log(`Server listening on port: ${PORT}`));

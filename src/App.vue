@@ -1,7 +1,7 @@
 <template>
   <div :class="{ dark: isDark }" class="min-h-screen">
     <HeaderBar :isDark="isDark" :user="user" @toggle-dark-mode="toggleDarkMode" @update:user="user = $event" />
-    <SourceTranslation />
+    <SourceTranslation :user="user" />
     <FooterBar />
   </div>
 </template>

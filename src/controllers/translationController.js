@@ -1,204 +1,137 @@
 import axios from 'axios';
-import googleTranslate from '@plainheart/google-translate-api';
-import bingTranslate from 'bing-translate-api';
+import { translateWikitext, translateTemplate as pipelineTranslateTemplate } from '../../server/services/translationPipeline.js';
+import { getAvailableServices } from '../../server/services/translationService.js';
 
-const translateTextUsingService = async (text, fromLanguage, toLanguage, translationService, apiKey) => {
-  if (!text || text.trim() === '') {
-    return text; // Return empty text as is
-  }
+// Simple in-memory sliding window rate limiter
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 100;
+
+export const rateLimiter = (req, res, next) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'anonymous';
+  const now = Date.now();
   
-  try {
-    if (translationService === 'google') {
-      const response = await googleTranslate(text, { 
-        from: fromLanguage, 
-        to: toLanguage, 
-        apiKey,
-        timeout: 20000 // 20 second timeout
-      });
-      return response.text;
-    } else if (translationService === 'microsoft') {
-      const response = await bingTranslate(text, fromLanguage, toLanguage, true, apiKey);
-      return response.translation;
-    } else if (translationService === 'mint') {
-      const response = await axios.post('https://translate.wmcloud.org/api/translate', {
-        content: text,
-        source_language: fromLanguage,
-        target_language: toLanguage,
-        format: 'text'
-      }, {
-        timeout: 25000 // 25 second timeout for Mint API
-      });
-      if (response.data && response.data.translation) {
-        return response.data.translation;
-      }
-      return text;
-    } else {
-      console.warn(`Unsupported translation service: ${translationService}, using original text`);
-      return text; 
-    }
-  } catch (error) {
-    console.error(`Translation service error (${translationService}) [${fromLanguage}->${toLanguage}]:`, error.message);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    }
-    // Return original text if translation fails
-    return text;
-  }
-};
-
-const extractTemplatesAndLinks = (text) => {
-  const templateRegex = /\{\{[^]*?\}\}/g;
-  const linkRegex = /\[\[[^\]]+\]\]/g;
-  const templates = [];
-  const links = [];
-  let match;
-
-  while ((match = templateRegex.exec(text)) !== null) {
-    templates.push(match[0]);
+  let entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.startTime > RATE_LIMIT_WINDOW_MS) {
+    entry = { count: 1, startTime: now };
+    rateLimitMap.set(ip, entry);
+    return next();
   }
 
-  while ((match = linkRegex.exec(text)) !== null) {
-    links.push(match[0]);
+  entry.count++;
+  if (entry.count > MAX_REQUESTS_PER_WINDOW) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded',
+      message: 'Too many translation requests. Please slow down and try again in a minute.',
+    });
   }
 
-  const cleanedText = text.replace(templateRegex, (match) => `TEMPLATE_PLACEHOLDER_${templates.indexOf(match)}`)
-                          .replace(linkRegex, (match) => `LINK_PLACEHOLDER_${links.indexOf(match)}`);
-
-  return { cleanedText, templates, links };
-};
-
-const rebuildTextWithTemplatesAndLinks = (text, templates, links) => {
-  let rebuiltText = text;
-  rebuiltText = rebuiltText.replace(/TEMPLATE_PLACEHOLDER_(\d+)/g, (match, index) => templates[index]);
-  rebuiltText = rebuiltText.replace(/LINK_PLACEHOLDER_(\d+)/g, (match, index) => links[index]);
-  return rebuiltText;
-};
-
-const translateTemplates = async (templates, fromLanguage, toLanguage) => {
-  try {
-    const translatedTemplates = await Promise.all(
-      templates.map(async (template) => {
-        try {
-          const templateText = template.replace(/\{\{|\}\}/g, '');
-          const response = await axios.get(`https://www.wikidata.org/w/api.php`, {
-            params: {
-              action: 'wbgetentities',
-              titles: templateText,
-              sites: `${fromLanguage}wiki`,
-              props: 'sitelinks',
-              format: 'json',
-              origin: '*'
-            },
-            headers: {
-              'User-Agent': 'SourceTranslationTool/1.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
-            },
-            timeout: 5000 // 5 second timeout
-          });
-          const entities = response.data.entities;
-          const entityId = Object.keys(entities)[0];
-          const sitelinks = entities[entityId].sitelinks;
-          const translatedTemplate = sitelinks && sitelinks[`${toLanguage}wiki`] ? sitelinks[`${toLanguage}wiki`].title : templateText;
-          return `{{${translatedTemplate}}}`;
-        } catch (error) {
-          console.warn(`Failed to translate template: ${template}. Using original.`, error.message);
-          return template; // Return the original template if translation fails
-        }
-      })
-    );
-    return translatedTemplates;
-  } catch (error) {
-    console.error('Error in translateTemplates:', error.message);
-    return templates; // Return original templates if the whole process fails
-  }
-};
-
-const translateLinks = async (links, fromLanguage, toLanguage) => {
-  try {
-    const translatedLinks = await Promise.all(
-      links.map(async (link) => {
-        try {
-          const linkText = link.replace(/\[\[|\]\]/g, '');
-          const response = await axios.get(`https://www.wikidata.org/w/api.php`, {
-            params: {
-              action: 'wbgetentities',
-              titles: linkText,
-              sites: `${fromLanguage}wiki`,
-              props: 'sitelinks',
-              format: 'json',
-              origin: '*'
-            },
-            headers: {
-              'User-Agent': 'SourceTranslationTool/1.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
-            },
-            timeout: 5000 // 5 second timeout
-          });
-          const entities = response.data.entities;
-          const entityId = Object.keys(entities)[0];
-          const sitelinks = entities[entityId].sitelinks;
-          const translatedLink = sitelinks && sitelinks[`${toLanguage}wiki`] ? sitelinks[`${toLanguage}wiki`].title : linkText;
-          return `[[${translatedLink}]]`;
-        } catch (error) {
-          console.warn(`Failed to translate link: ${link}. Using original.`, error.message);
-          return link; // Return the original link if translation fails
-        }
-      })
-    );
-    return translatedLinks;
-  } catch (error) {
-    console.error('Error in translateLinks:', error.message);
-    return links; // Return original links if the whole process fails
-  }
+  next();
 };
 
 export const translate = async (req, res) => {
-  const { text, fromLanguage, toLanguage, translationService, apiKey } = req.body;
+  const { text, fromLanguage, toLanguage, translationService, apiKey, apiEndpoint, model } = req.body;
+
+  if (!text || !fromLanguage || !toLanguage) {
+    return res.status(400).json({
+      error: 'Missing required fields',
+      message: 'text, fromLanguage, and toLanguage are required',
+    });
+  }
+
+  if (fromLanguage === toLanguage) {
+    return res.json({ translatedText: text, stats: { note: 'Same source and target language' } });
+  }
+
+  // Validate service
+  const validServices = getAvailableServices().map(s => s.id);
+  const service = validServices.includes(translationService) ? translationService : 'mint';
+
+  // Validate API key for services that require it
+  const serviceConfig = getAvailableServices().find(s => s.id === service);
+  if (serviceConfig?.requiresKey && (!apiKey || !apiKey.trim())) {
+    return res.status(400).json({
+      error: 'API key required',
+      message: `${serviceConfig.name} requires an API key. Please enter your API key.`,
+    });
+  }
 
   try {
-    // Extract templates and links
-    const { cleanedText, templates, links } = extractTemplatesAndLinks(text);
-    
-    // Translate templates and links with fallback to originals if they fail
-    let translatedTemplates = templates;
-    let translatedLinks = links;
-    let translatedText = cleanedText;
-    
-    try {
-      translatedTemplates = await translateTemplates(templates, fromLanguage, toLanguage);
-    } catch (templateError) {
-      console.error('Failed to translate templates:', templateError.message);
-      // Continue with original templates
-    }
-    
-    try {
-      translatedLinks = await translateLinks(links, fromLanguage, toLanguage);
-    } catch (linkError) {
-      console.error('Failed to translate links:', linkError.message);
-      // Continue with original links
-    }
-    
-    try {
-      translatedText = await translateTextUsingService(cleanedText, fromLanguage, toLanguage, translationService, apiKey);
-    } catch (textError) {
-      console.error('Failed to translate text:', textError.message);
-      // If text translation fails, we'll still return the document with translated templates/links if those worked
-    }
-    
-    // Rebuild the text with whatever translations succeeded
-    const rebuiltText = rebuildTextWithTemplatesAndLinks(translatedText, translatedTemplates, translatedLinks);
-    res.json({ translatedText: rebuiltText });
+    console.log(`[Translation] ${fromLanguage} → ${toLanguage} via ${service} (${text.length} chars)`);
+
+    const { translatedText, stats } = await translateWikitext(
+      text,
+      fromLanguage,
+      toLanguage,
+      service,
+      { apiKey, apiEndpoint, model }
+    );
+
+    console.log(`[Translation] Done in ${stats.timingMs?.total || '?'}ms. Links: ${stats.linksTranslated}/${stats.linksFound}, Templates: ${stats.templatesTranslated}/${stats.templatesFound}, Params: ${stats.templateParamsTranslated || 0}, Errors: ${stats.errors.length}`);
+
+    res.json({ translatedText, stats });
   } catch (error) {
     console.error('Error during translation process:', error);
-    res.status(500).json({ 
-      error: 'Error during translation', 
+    res.status(500).json({
+      error: 'Error during translation',
       message: error.message || 'Unknown error',
-      suggestion: 'Please try again later or with a different translation service'
+      suggestion: 'Please try again later or with a different translation service',
     });
   }
 };
 
+export const translateTemplate = async (req, res) => {
+  const { template, fromLanguage, toLanguage, translationService, apiKey, apiEndpoint, model } = req.body;
+
+  if (!template || !fromLanguage || !toLanguage) {
+    return res.status(400).json({
+      error: 'Missing required fields',
+      message: 'template, fromLanguage, and toLanguage are required',
+    });
+  }
+
+  const validServices = getAvailableServices().map(s => s.id);
+  const service = validServices.includes(translationService) ? translationService : 'mint';
+
+  const serviceConfig = getAvailableServices().find(s => s.id === service);
+  if (serviceConfig?.requiresKey && (!apiKey || !apiKey.trim())) {
+    return res.status(400).json({
+      error: 'API key required',
+      message: `${serviceConfig.name} requires an API key. Please enter your API key.`,
+    });
+  }
+
+  try {
+    const result = await pipelineTranslateTemplate(
+      template,
+      fromLanguage,
+      toLanguage,
+      service,
+      { apiKey, apiEndpoint, model }
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('Error during template translation:', error);
+    res.status(500).json({
+      error: 'Template translation error',
+      message: error.message || 'Unknown error during template translation',
+    });
+  }
+};
+
+export const services = (req, res) => {
+  res.json(getAvailableServices());
+};
+
 export const preview = async (req, res) => {
   const { text, language } = req.body;
+
+  if (!text || !language) {
+    return res.status(400).json({
+      error: 'Missing required fields',
+      message: 'text and language are required',
+    });
+  }
 
   try {
     const response = await axios.get(`https://${language}.wikipedia.org/w/api.php`, {
@@ -212,12 +145,15 @@ export const preview = async (req, res) => {
         uselang: language
       },
       headers: {
-        'User-Agent': 'SourceTranslationTool/1.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
+        'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)'
       }
     });
     res.json({ html: response.data.parse.text['*'] });
   } catch (error) {
-    console.error('Error generating preview:', error);
-    res.status(500).send('Error generating preview');
+    console.error('Error generating preview:', error.message);
+    res.status(500).json({
+      error: 'Preview generation failed',
+      message: error.message || 'Could not render wikitext preview',
+    });
   }
 };

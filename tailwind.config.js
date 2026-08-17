@@ -25,12 +25,17 @@ module.exports = {
         },
         surface: {
           light: '#ffffff',
-          dark: '#0f172a',
+          dark: '#09090b',
         },
         card: {
-          light: 'rgba(255, 255, 255, 0.7)',
-          dark: 'rgba(30, 41, 59, 0.7)',
-        }
+          light: 'rgba(255, 255, 255, 0.75)',
+          dark: 'rgba(18, 18, 22, 0.75)',
+        },
+        zinc: {
+          850: '#18181b',
+          925: '#0f0f12',
+          950: '#09090b',
+        },
       },
       backdropBlur: {
         xs: '2px',

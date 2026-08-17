@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     proxy: {
-      '/translate': 'http://localhost:3000',
+      '/translate': {
+        target: 'http://localhost:3000',
+      },
       '/preview': 'http://localhost:3000',
       '/auth': 'http://localhost:3000',
     }

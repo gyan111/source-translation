@@ -25,13 +25,13 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
       <!-- Source (left) -->
       <div>
-        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
+        <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
           {{ $t('paragraph.source') }}
         </label>
         <textarea
           :value="source"
           readonly
-          class="textarea-field bg-slate-50 dark:bg-slate-800/50 min-h-[100px]"
+          class="textarea-field bg-slate-50/80 dark:bg-zinc-900/40 text-slate-700 dark:text-zinc-300 min-h-[100px] border-slate-200/80 dark:border-white/[0.06]"
           rows="4"
         ></textarea>
       </div>
@@ -39,7 +39,7 @@
       <!-- Translation (right) -->
       <div>
         <div class="flex items-center justify-between mb-1.5">
-          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
             {{ $t('paragraph.translation') }}
           </label>
           <button

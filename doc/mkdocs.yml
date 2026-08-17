@@ -1,0 +1,88 @@
+site_name: Source Translation Tool
+site_description: Wiki article translation tool with pluggable backends and Wikidata-powered link resolution
+site_url: https://gyan111.github.io/source-translation/
+repo_url: https://github.com/gyan111/source-translation
+repo_name: gyan111/source-translation
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.tabs
+    - content.code.copy
+    - content.tabs.link
+    - search.highlight
+    - search.suggest
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - def_list
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Tutorials:
+    - Getting Started: tutorials/getting-started.md
+    - Adding a Translation Service: tutorials/adding-translation-service.md
+  - How-to Guides:
+    - Configure OpenAI: how-to/configure-openai.md
+    - Self-host LibreTranslate: how-to/self-host-libretranslate.md
+    - Translate Wikitext: how-to/translate-wikitext.md
+    - Translate Templates: how-to/translate-template.md
+  - Reference:
+    - Architecture: reference/architecture.md
+    - API Endpoints: reference/api.md
+    - Translation Services: reference/translation-services.md
+    - Wikitext Parser: reference/wikitext-parser.md
+  - Explanation:
+    - Translation Pipeline: explanation/translation-pipeline.md
+    - Wikidata Link Resolution: explanation/wikidata-resolution.md
+    - Design Decisions: explanation/design-decisions.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/gyan111/source-translation
