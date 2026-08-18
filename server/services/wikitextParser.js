@@ -436,9 +436,20 @@ export function reassembleWikitext(
         } else {
           // If link target changed, add piped link with translated display
           if (newTarget !== seg.target) {
-            parts.push(`[[${newTarget}|${translatedDisplayTexts[seg.target] ?? newTarget}]]`);
+            let display = translatedDisplayTexts[seg.target] ?? newTarget;
+            const parenMatch = display.match(/^(.+?)\s*\([^)]+\)$/);
+            if (parenMatch && parenMatch[1].trim()) {
+              display = parenMatch[1].trim();
+            }
+            parts.push(`[[${newTarget}|${display}]]`);
           } else {
-            parts.push(`[[${newTarget}]]`);
+            // Pipe trick: auto-generate piped label for titles with disambiguation brackets
+            const parenMatch = newTarget.match(/^(.+?)\s*\([^)]+\)$/);
+            if (parenMatch && parenMatch[1].trim()) {
+              parts.push(`[[${newTarget}|${parenMatch[1].trim()}]]`);
+            } else {
+              parts.push(`[[${newTarget}]]`);
+            }
           }
         }
         break;

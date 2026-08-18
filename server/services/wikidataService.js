@@ -233,7 +233,73 @@ async function fetchBatch(titles, fromLang, toLang) {
     if (entity && entity.sitelinks && entity.sitelinks[targetSite]) {
       result[title] = entity.sitelinks[targetSite].title;
     } else {
-      result[title] = title; // Fallback to original
+      result[title] = title; // Default fallback to original
+    }
+  }
+
+  // Phase 2: Redirect Resolution for any unresolved titles
+  // When a source title is a redirect (e.g. 'US' -> 'United States'), wbgetentities fails
+  // We query the source Wikipedia with redirects=1 to extract the canonical Wikibase QID
+  const unresolvedTitles = titles.filter(t => result[t] === t);
+  if (unresolvedTitles.length > 0) {
+    try {
+      const wikiRes = await axios.get(`https://${fromLang}.wikipedia.org/w/api.php`, {
+        params: {
+          action: 'query',
+          titles: unresolvedTitles.join('|'),
+          redirects: '1',
+          prop: 'pageprops',
+          ppprop: 'wikibase_item',
+          format: 'json',
+          origin: '*',
+        },
+        headers: { 'User-Agent': USER_AGENT },
+        timeout: REQUEST_TIMEOUT,
+      });
+
+      const pages = wikiRes.data?.query?.pages || {};
+      const qids = [];
+      const titleToQid = {};
+
+      const redirectMap = {};
+      if (wikiRes.data?.query?.redirects) {
+        for (const r of wikiRes.data.query.redirects) {
+          redirectMap[r.from] = r.to;
+        }
+      }
+
+      for (const page of Object.values(pages)) {
+        if (page.pageprops?.wikibase_item) {
+          const qid = page.pageprops.wikibase_item;
+          qids.push(qid);
+          titleToQid[page.title] = qid;
+        }
+      }
+
+      if (qids.length > 0) {
+        const qidResponse = await axios.get(WIKIDATA_API, {
+          params: {
+            action: 'wbgetentities',
+            ids: [...new Set(qids)].join('|'),
+            props: 'sitelinks',
+            format: 'json',
+            origin: '*',
+          },
+          headers: { 'User-Agent': USER_AGENT },
+          timeout: REQUEST_TIMEOUT,
+        });
+
+        const qidEntities = qidResponse.data?.entities || {};
+        for (const title of unresolvedTitles) {
+          const canonicalTitle = redirectMap[title] || title;
+          const qid = titleToQid[canonicalTitle];
+          if (qid && qidEntities[qid]?.sitelinks?.[targetSite]) {
+            result[title] = qidEntities[qid].sitelinks[targetSite].title;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Wikidata] Redirect resolution fallback warning:', e.message);
     }
   }
 

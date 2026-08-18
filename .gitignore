@@ -25,3 +25,8 @@ dist-ssr
 
 # Internal local documentation
 TOOL_GUIDE.md
+
+# Environment variables
+.env
+.env.local
+

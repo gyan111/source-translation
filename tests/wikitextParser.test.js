@@ -91,6 +91,21 @@ describe('wikitextParser', () => {
       expect(result).toBe('Bonjour [[Monde|Monde]]. {{Salutation| msg = welcome}}');
     });
 
+    it('applies pipe trick to wikilinks with disambiguation brackets automatically', () => {
+      const source = 'Starred in [[Dhee (film)]] and [[Titanic (1997 film)]].';
+      const segments = parseWikitext(source);
+
+      const result = reassembleWikitext(
+        segments,
+        {},
+        {},
+        {},
+        {}
+      );
+
+      expect(result).toBe('Starred in [[Dhee (film)|Dhee]] and [[Titanic (1997 film)|Titanic]].');
+    });
+
     it('reassembles translated categories correctly', () => {
       const source = 'Text [[Category:Physicists]]';
       const segments = parseWikitext(source);
