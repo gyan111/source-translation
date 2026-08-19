@@ -28,7 +28,7 @@
             ]"
           >
             <span class="material-icons-round text-sm">article</span>
-            <span>Article Translation</span>
+            <span>{{ $t('toolbar.articleMode') }}</span>
           </button>
           <button
             type="button"
@@ -41,7 +41,7 @@
             ]"
           >
             <span class="material-icons-round text-sm">extension</span>
-            <span>Template Mode</span>
+            <span>{{ $t('toolbar.templateMode') }}</span>
           </button>
           <button
             type="button"
@@ -54,7 +54,7 @@
             ]"
           >
             <span class="material-icons-round text-sm">code</span>
-            <span>Raw Wikitext</span>
+            <span>{{ $t('toolbar.wikitextMode') }}</span>
           </button>
         </div>
 
@@ -66,7 +66,7 @@
         >
           <div class="flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span class="text-slate-400 dark:text-zinc-500 font-normal">Engine:</span>
+            <span class="text-slate-400 dark:text-zinc-500 font-normal">{{ $t('toolbar.engine') }}:</span>
             <span class="font-semibold text-slate-800 dark:text-zinc-200">{{ currentServiceDisplayName }}</span>
           </div>
           <span class="material-icons-round text-sm text-slate-400 hover:text-primary-500 transition-colors">tune</span>
@@ -117,7 +117,7 @@
                 class="absolute right-1.5 px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 active:bg-primary-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1 disabled:opacity-50"
               >
                 <span class="material-icons-round text-xs" :class="{ 'animate-spin': fetchingArticle }">{{ fetchingArticle ? 'refresh' : 'download' }}</span>
-                <span>{{ fetchingArticle ? 'Fetching...' : $t('toolbar.getArticle') }}</span>
+                <span>{{ fetchingArticle ? $t('toolbar.fetching') : $t('toolbar.getArticle') }}</span>
               </button>
             </div>
 
@@ -152,7 +152,7 @@
         <div class="flex items-center gap-2">
           <button @click="translateAllPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5">
             <span class="material-icons-round text-sm">auto_fix_high</span>
-            <span>Translate All Pending</span>
+            <span>{{ $t('toolbar.translateAllPending') }}</span>
           </button>
         </div>
 
@@ -171,7 +171,7 @@
           </button>
           <button @click="confirmReset" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40">
             <span class="material-icons-round text-sm">restart_alt</span>
-            <span>Reset</span>
+            <span>{{ $t('toolbar.reset') }}</span>
           </button>
         </div>
       </div>

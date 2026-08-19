@@ -32,7 +32,7 @@
               {{ $t('paragraph.source') }}
             </span>
           </label>
-          <span class="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Read-Only</span>
+          <span class="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">{{ $t('paragraph.readOnly') }}</span>
         </div>
         <textarea
           :value="source"
