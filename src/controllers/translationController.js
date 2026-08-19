@@ -72,10 +72,21 @@ export const translate = async (req, res) => {
     res.json({ translatedText, stats });
   } catch (error) {
     console.error('Error during translation process:', error);
-    res.status(500).json({
-      error: 'Error during translation',
-      message: error.message || 'Unknown error',
-      suggestion: 'Please try again later or with a different translation service',
+    // Graceful fallback: return text with error stats instead of throwing a 500 crash
+    res.json({
+      translatedText: text,
+      stats: {
+        totalSegments: 1,
+        textSegments: 1,
+        linksFound: 0,
+        linksTranslated: 0,
+        categoriesFound: 0,
+        categoriesTranslated: 0,
+        templatesFound: 0,
+        templatesTranslated: 0,
+        errors: [error.message || 'Translation error occurred'],
+        timingMs: { total: 0 },
+      },
     });
   }
 };
@@ -112,9 +123,17 @@ export const translateTemplate = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error during template translation:', error);
-    res.status(500).json({
-      error: 'Template translation error',
-      message: error.message || 'Unknown error during template translation',
+    res.json({
+      translatedTemplate: template,
+      parsed: { name: 'template', params: [] },
+      stats: {
+        templateName: '',
+        translatedName: '',
+        paramsCount: 0,
+        paramsTranslated: 0,
+        errors: [error.message || 'Template translation error'],
+        timingMs: { total: 0 },
+      },
     });
   }
 };
