@@ -121,18 +121,20 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
   }
   stats.timingMs.templates = Date.now() - stepStart;
 
-  // Step 6: Translate text segments via translation service
+  // Step 6: Translate text and heading segments via translation service
   if (onProgress) onProgress('text', 50);
   stepStart = Date.now();
   const textSegments = segments.filter(s => s.type === 'text').map(s => s.content);
-  stats.textSegments = textSegments.length;
+  const headingTexts = segments.filter(s => s.type === 'heading').map(s => s.text);
+  const allTextsToTranslate = [...new Set([...textSegments, ...headingTexts])];
+  stats.textSegments = allTextsToTranslate.length;
 
   let translatedTextsMap = {};
   try {
-    translatedTextsMap = await translateTexts(textSegments, fromLang, toLang, service, options);
+    translatedTextsMap = await translateTexts(allTextsToTranslate, fromLang, toLang, service, options);
   } catch (err) {
     stats.errors.push(`Text translation error: ${err.message}`);
-    for (const t of textSegments) translatedTextsMap[t] = t;
+    for (const t of allTextsToTranslate) translatedTextsMap[t] = t;
   }
   stats.timingMs.textTranslation = Date.now() - stepStart;
 
@@ -158,18 +160,36 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
   }
   stats.timingMs.displayTexts = Date.now() - stepStart;
 
-  // Step 8: Translate text-heavy template parameters
+  // Step 8: Translate template parameters (handling both wikilinks and plain text)
   if (onProgress) onProgress('template_params', 85);
   stepStart = Date.now();
   let translatedParamTexts = {};
   if (templateParamTexts.length > 0) {
-    const paramTextValues = [...new Set(templateParamTexts.map(p => p.text))];
     try {
-      translatedParamTexts = await translateTexts(paramTextValues, fromLang, toLang, service, options);
+      for (const p of templateParamTexts) {
+        if (p.hasWikilinks) {
+          // Has inner wikilinks or nested markup: run through pipeline to resolve sitelinks and avoid MT token corruption
+          const res = await translateWikitext(p.text, fromLang, toLang, service, options);
+          translatedParamTexts[p.text] = res.translatedText;
+        }
+      }
+
+      const plainParamTexts = templateParamTexts
+        .filter(p => !p.hasWikilinks)
+        .map(p => p.text);
+      const uniquePlainParamTexts = [...new Set(plainParamTexts)];
+
+      if (uniquePlainParamTexts.length > 0) {
+        const plainTranslated = await translateTexts(uniquePlainParamTexts, fromLang, toLang, service, options);
+        translatedParamTexts = { ...translatedParamTexts, ...plainTranslated };
+      }
+
       stats.templateParamsTranslated = Object.entries(translatedParamTexts).filter(([k, v]) => k !== v).length;
     } catch (err) {
       stats.errors.push(`Template parameter translation error: ${err.message}`);
-      for (const t of paramTextValues) translatedParamTexts[t] = t;
+      for (const p of templateParamTexts) {
+        if (!translatedParamTexts[p.text]) translatedParamTexts[p.text] = p.text;
+      }
     }
   }
   stats.timingMs.templateParams = Date.now() - stepStart;

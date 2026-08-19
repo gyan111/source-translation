@@ -88,7 +88,28 @@ describe('wikitextParser', () => {
         translatedDisplayTexts
       );
 
-      expect(result).toBe('Bonjour [[Monde|Monde]]. {{Salutation| msg = welcome}}');
+      expect(result).toBe('Bonjour [[Monde|Monde]]. {{Salutation | msg = welcome}}');
+    });
+
+    it('translates headings and formats them on their own lines', () => {
+      const source = '== Geography ==\nSome description here.';
+      const segments = parseWikitext(source);
+
+      const headingSeg = segments.find(s => s.type === 'heading');
+      expect(headingSeg).toBeDefined();
+      expect(headingSeg.text).toBe('Geography');
+      expect(headingSeg.level).toBe(2);
+
+      const result = reassembleWikitext(
+        segments,
+        { 'Geography': 'ଭୂଗୋଳ', 'Some description here.': 'କିଛି ବର୍ଣ୍ଣନା ଏଠାରେ।' },
+        {},
+        {},
+        {}
+      );
+
+      expect(result).toContain('== ଭୂଗୋଳ ==');
+      expect(result).toContain('କିଛି ବର୍ଣ୍ଣନା ଏଠାରେ।');
     });
 
     it('applies pipe trick to wikilinks with disambiguation brackets automatically', () => {

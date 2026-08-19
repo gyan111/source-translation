@@ -209,7 +209,7 @@ export function parseWikitext(wikitext) {
     placeholderIndex++;
   }
 
-  // Phase 3: Split remaining text by placeholders to get text segments
+  // Phase 3: Split remaining text by placeholders and extract headings
   const parts = working.split(/(\x00[A-Z]+_\d+\x00)/);
 
   // Helper to recursively restore any protected items that were captured inside another item (e.g. comment inside template)
@@ -242,8 +242,37 @@ export function parseWikitext(wikitext) {
         });
       }
     } else {
-      // This is a text segment that needs translation
-      segments.push({ type: 'text', content: part });
+      // Split text part by heading lines so headings are translated as pure text without '=' marks
+      const lines = part.split('\n');
+      let currentProse = [];
+
+      for (let idx = 0; idx < lines.length; idx++) {
+        const line = lines[idx];
+        const headingMatch = line.match(/^([ \t]*)(={2,})\s*([^=\n]+?)\s*(={2,})([ \t]*)$/);
+
+        if (headingMatch) {
+          if (currentProse.length > 0) {
+            segments.push({ type: 'text', content: currentProse.join('\n') });
+            currentProse = [];
+          }
+          const leftEquals = headingMatch[2].length;
+          const rightEquals = headingMatch[4].length;
+          const level = Math.min(Math.min(leftEquals, rightEquals), 6);
+          const headingText = headingMatch[3].trim();
+          segments.push({
+            type: 'heading',
+            level,
+            text: headingText,
+            content: line,
+          });
+        } else {
+          currentProse.push(line);
+        }
+      }
+
+      if (currentProse.length > 0) {
+        segments.push({ type: 'text', content: currentProse.join('\n') });
+      }
     }
   }
 
@@ -270,22 +299,41 @@ export function extractLinkTargets(segments) {
 
 /**
  * Extract template names from segments for batch Wikidata lookup.
- * Returns just the template name (before first |).
+ * Strips any HTML comments and returns just the clean template name.
  */
 export function extractTemplateNames(segments) {
   return segments
     .filter(s => s.type === 'template')
     .map(s => {
       const inner = s.content.slice(2, -2); // Remove {{ and }}
-      const name = inner.split('|')[0].trim();
+      const withoutComments = inner.replace(/<!--[\s\S]*?-->/g, '').trim();
+      const name = withoutComments.split('|')[0].trim();
       return name;
     })
     .filter(name => name && !name.startsWith('#') && !name.startsWith('{'));
 }
 
 /**
+ * Determines whether a template parameter value represents translatable text.
+ */
+export function isTranslatableParamValue(val) {
+  if (!val || typeof val !== 'string') return false;
+  const t = val.trim();
+  if (t.length === 0) return false;
+  if (/^\d+$/.test(t)) return false;
+  if (/^\d+\s*(?:px|em|%|km|m|cm|kg|g|°|ft|in)$/i.test(t)) return false;
+  if (/^\d+\s*[×x]\s*\d+\s*(?:px)?$/i.test(t)) return false;
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return false;
+  if (/^\+?\d[\d\s-]{4,}$/.test(t)) return false;
+  if (/^https?:\/\//i.test(t)) return false;
+  if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(t)) return false;
+  if (/^[A-Za-z0-9_.-]+\.(?:jpg|jpeg|png|svg|gif|webp|tiff|pdf|ogg|mp3|mp4)$/i.test(t)) return false;
+  return true;
+}
+
+/**
  * Extract translatable text segments from template parameters.
- * Returns an array of { templateIndex, paramIndex, text } for text-heavy params.
+ * Returns an array of { segmentIndex, paramIndex, paramName, text, hasWikilinks }.
  */
 export function extractTemplateParamTexts(segments) {
   const paramTexts = [];
@@ -293,23 +341,24 @@ export function extractTemplateParamTexts(segments) {
   segments.forEach((seg, segIdx) => {
     if (seg.type !== 'template') return;
 
-    const inner = seg.content.slice(2, -2);
-    const pipeIdx = inner.indexOf('|');
-    if (pipeIdx === -1) return;
-
-    const paramsStr = inner.slice(pipeIdx + 1);
-    const params = splitTemplateParams(paramsStr);
-
-    params.forEach((param, paramIdx) => {
-      const eqIdx = param.indexOf('=');
-      if (eqIdx === -1) return;
-
-      const value = param.slice(eqIdx + 1).trim();
-      // Only translate params that look like prose text (>20 chars, has spaces)
-      if (value.length > 20 && value.includes(' ') && !isNumericOrDate(value)) {
-        paramTexts.push({ segmentIndex: segIdx, paramIndex: paramIdx, paramName: param.slice(0, eqIdx).trim(), text: value });
-      }
-    });
+    try {
+      const parsed = parseTemplate(seg.content);
+      parsed.params.forEach((param, paramIdx) => {
+        if (param.isComment) return;
+        const val = param.value.trim();
+        if (isTranslatableParamValue(val)) {
+          paramTexts.push({
+            segmentIndex: segIdx,
+            paramIndex: paramIdx,
+            paramName: param.name,
+            text: val,
+            hasWikilinks: val.includes('[[') || val.includes('{{'),
+          });
+        }
+      });
+    } catch {
+      // Fallback
+    }
   });
 
   return paramTexts;
@@ -347,16 +396,9 @@ function splitTemplateParams(str) {
 }
 
 /**
- * Check if a value looks numeric, date-like, or not prose.
- */
-function isNumericOrDate(val) {
-  return /^\d[\d,./ -]*$/.test(val.trim()) || /^\d{4}-\d{2}-\d{2}/.test(val.trim());
-}
-
-/**
  * Normalizes wikitext syntax after machine translation:
  *  - Fixes spaces in headings introduced by MT: "= = Heading = =" -> "== Heading =="
- *  - Ensures linebreaks before headings and list items
+ *  - Ensures headings are separated on their own clean lines
  *  - Trims inner wikilink spacing
  *  - Strips any remaining unexpanded null/placeholder byte tokens
  */
@@ -365,17 +407,20 @@ export function normalizeWikitextSyntax(wikitext) {
 
   const lines = wikitext.split('\n');
   const normalizedLines = lines.map(line => {
-    // Check if line is a heading with spaced or unspaced equal signs:
-    // e.g. "= = Heading = =" or "= = = Heading = = =" or "== Heading =="
-    const headingMatch = line.match(/^([ \t]*)((?:=\s*){2,})(.*?)((?:\s*=){2,})[ \t]*$/);
+    // Check if line contains a heading (e.g. "= = Heading = =" or "= = = = Sub = = = =" or "= = Heading = = Some text")
+    const headingMatch = line.match(/^([ \t]*)((?:=\s*){2,})(.*?)((?:\s*=){2,})([ \t]*(.*))$/);
     if (headingMatch) {
       const leftEqualsCount = (headingMatch[2].match(/=/g) || []).length;
       const rightEqualsCount = (headingMatch[4].match(/=/g) || []).length;
       const headingText = headingMatch[3].replace(/^=+|==+$/g, '').trim();
+      const trailing = headingMatch[6] ? headingMatch[6].trim() : '';
 
       if (leftEqualsCount >= 2 && rightEqualsCount >= 2 && headingText) {
         const level = Math.min(Math.min(leftEqualsCount, rightEqualsCount), 6);
         const eq = '='.repeat(level);
+        if (trailing) {
+          return `${eq} ${headingText} ${eq}\n\n${trailing}`;
+        }
         return `${eq} ${headingText} ${eq}`;
       }
     }
@@ -395,7 +440,10 @@ export function normalizeWikitextSyntax(wikitext) {
   result = result.replace(/\x00[A-Z]+_\d+\x00/g, '');
   result = result.replace(/◆[A-Z]+_\d+◆/g, '');
 
-  return result;
+  // Normalize excessive consecutive blank lines (max 2)
+  result = result.replace(/\n{3,}/g, '\n\n');
+
+  return result.trim();
 }
 
 /**
@@ -428,6 +476,14 @@ export function reassembleWikitext(
         break;
       }
 
+      case 'heading': {
+        const level = seg.level || 2;
+        const eq = '='.repeat(level);
+        const translatedHeading = translatedTexts[seg.text] ?? seg.text;
+        parts.push(`\n\n${eq} ${translatedHeading.trim()} ${eq}\n\n`);
+        break;
+      }
+
       case 'link': {
         const newTarget = translatedLinks[seg.target] ?? seg.target;
         if (seg.display) {
@@ -456,27 +512,39 @@ export function reassembleWikitext(
       }
 
       case 'template': {
-        const inner = seg.content.slice(2, -2);
-        const pipeIndex = inner.indexOf('|');
-        if (pipeIndex === -1) {
-          const name = inner.trim();
-          const translatedName = translatedTemplates[name] ?? name;
-          parts.push(`{{${translatedName}}}`);
-        } else {
-          const name = inner.slice(0, pipeIndex).trim();
-          let params = inner.slice(pipeIndex); // includes leading |
-          const translatedName = translatedTemplates[name] ?? name;
+        try {
+          const parsed = parseTemplate(seg.content);
+          const translatedName = translatedTemplates[parsed.name] || parsed.name;
+          const reassembled = reassembleTemplate(
+            parsed,
+            translatedName,
+            translatedParamTexts,
+            {}
+          );
+          parts.push(reassembled);
+        } catch {
+          const inner = seg.content.slice(2, -2);
+          const pipeIndex = inner.indexOf('|');
+          if (pipeIndex === -1) {
+            const cleanName = inner.replace(/<!--[\s\S]*?-->/g, '').trim();
+            const translatedName = translatedTemplates[cleanName] ?? cleanName;
+            parts.push(`{{${translatedName}}}`);
+          } else {
+            const rawName = inner.slice(0, pipeIndex);
+            const cleanName = rawName.replace(/<!--[\s\S]*?-->/g, '').trim();
+            let params = inner.slice(pipeIndex);
+            const translatedName = translatedTemplates[cleanName] ?? cleanName;
 
-          // Translate text-heavy parameter values
-          if (Object.keys(translatedParamTexts).length > 0) {
-            for (const [original, translated] of Object.entries(translatedParamTexts)) {
-              if (params.includes(original)) {
-                params = params.replace(original, translated);
+            if (Object.keys(translatedParamTexts).length > 0) {
+              for (const [original, translated] of Object.entries(translatedParamTexts)) {
+                if (params.includes(original)) {
+                  params = params.split(original).join(translated);
+                }
               }
             }
-          }
 
-          parts.push(`{{${translatedName}${params}}}`);
+            parts.push(`{{${translatedName}${params}}}`);
+          }
         }
         break;
       }
@@ -509,10 +577,10 @@ export function reassembleWikitext(
 
 /**
  * Parse a standalone template wikitext string.
- * Supports multi-line templates like Infoboxes with key-value parameters.
+ * Supports multi-line templates like Infoboxes with key-value parameters and comments.
  *
  * @param {string} templateStr - E.g. "{{Infobox person | name = Albert | birth_date = 1879 }}"
- * @returns {Object} { name, params: [{ name, value, raw, isNamed, prefix, suffix }], isMultiLine }
+ * @returns {Object} { name, headerComments, params: [{ name, value, raw, isNamed, isComment, index }], isMultiLine }
  */
 export function parseTemplate(templateStr) {
   const trimmed = templateStr.trim();
@@ -525,19 +593,38 @@ export function parseTemplate(templateStr) {
   const pipeIdx = inner.indexOf('|');
 
   if (pipeIdx === -1) {
+    const rawName = inner.trim();
+    const cleanName = rawName.replace(/<!--[\s\S]*?-->/g, '').trim();
+    const headerComments = (rawName.match(/<!--[\s\S]*?-->/g) || []).join('\n');
     return {
-      name: inner.trim(),
+      name: cleanName,
+      headerComments,
       params: [],
       isMultiLine,
       raw: trimmed,
     };
   }
 
-  const name = inner.slice(0, pipeIdx).trim();
+  const rawNameWithComments = inner.slice(0, pipeIdx).trim();
+  const name = rawNameWithComments.replace(/<!--[\s\S]*?-->/g, '').trim();
+  const headerComments = (rawNameWithComments.match(/<!--[\s\S]*?-->/g) || []).join('\n');
+
   const paramsStr = inner.slice(pipeIdx + 1);
   const rawParams = splitTemplateParams(paramsStr);
 
   const params = rawParams.map((rawParam, idx) => {
+    const trimmedP = rawParam.trim();
+    if (trimmedP.startsWith('<!--') && trimmedP.endsWith('-->')) {
+      return {
+        name: `_comment_${idx}`,
+        value: trimmedP,
+        raw: rawParam,
+        isNamed: false,
+        isComment: true,
+        index: idx,
+      };
+    }
+
     const eqIdx = rawParam.indexOf('=');
     if (eqIdx !== -1) {
       const key = rawParam.slice(0, eqIdx).trim();
@@ -547,14 +634,16 @@ export function parseTemplate(templateStr) {
         value: val,
         raw: rawParam,
         isNamed: true,
+        isComment: false,
         index: idx,
       };
     } else {
       return {
         name: String(idx + 1),
-        value: rawParam.trim(),
+        value: trimmedP,
         raw: rawParam,
         isNamed: false,
+        isComment: false,
         index: idx,
       };
     }
@@ -562,6 +651,7 @@ export function parseTemplate(templateStr) {
 
   return {
     name,
+    headerComments,
     params,
     isMultiLine,
     raw: trimmed,
@@ -586,12 +676,22 @@ export function reassembleTemplate(
   const name = translatedName || parsedTemplate.name;
 
   if (!parsedTemplate.params || parsedTemplate.params.length === 0) {
+    if (parsedTemplate.headerComments) {
+      return `{{${name}\n${parsedTemplate.headerComments}\n}}`;
+    }
     return `{{${name}}}`;
   }
 
   if (parsedTemplate.isMultiLine) {
     const lines = [`{{${name}`];
+    if (parsedTemplate.headerComments) {
+      lines.push(parsedTemplate.headerComments);
+    }
     for (const p of parsedTemplate.params) {
+      if (p.isComment) {
+        lines.push(p.value);
+        continue;
+      }
       const pName = translatedParamNames[p.name] || p.name;
       const pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
       if (p.isNamed) {
@@ -603,11 +703,15 @@ export function reassembleTemplate(
     lines.push('}}');
     return lines.join('\n');
   } else {
+    const headerPrefix = parsedTemplate.headerComments ? ` ${parsedTemplate.headerComments}` : '';
     const paramParts = parsedTemplate.params.map(p => {
+      if (p.isComment) return p.value;
       const pName = translatedParamNames[p.name] || p.name;
       const pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
       return p.isNamed ? `${pName} = ${pVal}` : pVal;
     });
-    return `{{${name} | ${paramParts.join(' | ')}}}`;
+    const hasSpaceBeforeFirstPipe = parsedTemplate.raw && parsedTemplate.raw.startsWith(`{{${parsedTemplate.name} `);
+    const sep = hasSpaceBeforeFirstPipe ? ' | ' : '| ';
+    return `{{${name}${headerPrefix}${sep}${paramParts.join(' | ')}}}`;
   }
 }

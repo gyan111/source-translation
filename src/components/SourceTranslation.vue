@@ -1030,7 +1030,15 @@ export default {
     },
 
     splitIntoParagraphs(wikitext) {
-      const parts = wikitext.split(/\n\n+/).filter(p => p.trim() !== '');
+      if (!wikitext || typeof wikitext !== 'string') {
+        this.paragraphs = [];
+        return;
+      }
+      // Ensure headings have clean section boundaries
+      let cleaned = wikitext.replace(/([^\n])\n([ \t]*={2,}[^\n=]+={2,})/g, '$1\n\n$2');
+      cleaned = cleaned.replace(/(={2,}[^\n=]+={2,}[ \t]*)\n([^\n=])/g, '$1\n\n$2');
+
+      const parts = cleaned.split(/\n\n+/).filter(p => p.trim() !== '');
       this.paragraphs = parts.map(source => ({
         source: source.trim(),
         translation: '',

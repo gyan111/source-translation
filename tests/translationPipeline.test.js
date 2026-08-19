@@ -66,4 +66,38 @@ describe('translationPipeline', () => {
     expect(translatedTemplate).toContain('{{Infobox');
     expect(stats.paramsCount).toBe(1);
   });
+
+  it('translates complex infobox with comments and headings without mangling', async () => {
+    // Mock Wikidata template name lookup
+    axios.get.mockResolvedValueOnce({
+      data: {
+        entities: {
+          Q1: { sitelinks: { orwiki: { title: 'Template:Infobox settlement' }, pawiki: { title: 'Template:Infobox settlement' } } },
+        },
+      },
+    });
+
+    // Mock translation service
+    axios.post.mockResolvedValue({
+      data: {
+        translation: 'ਕਾਲਾਬੁਦਾ',
+      },
+    });
+
+    const wikitext = `{{Infobox settlement
+<!-- See Template:Infobox settlement for additional fields and descriptions -->
+|official_name = କଳାବୁଦା
+|settlement_type = ଗ୍ରାମ
+}}
+
+== ଭୂଗୋଳ ==
+ଏହି ଗ୍ରାମଟି ଏକ ସୁନ୍ଦର ଗ୍ରାମ।`;
+
+    const { translatedText } = await translateWikitext(wikitext, 'or', 'pa', 'mint');
+
+    expect(translatedText).toContain('{{Infobox settlement');
+    expect(translatedText).toContain('<!-- See Template:Infobox settlement for additional fields and descriptions -->');
+    expect(translatedText).toContain('==');
+    expect(translatedText).not.toContain('= =');
+  });
 });
