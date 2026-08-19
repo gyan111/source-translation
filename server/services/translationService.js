@@ -96,11 +96,12 @@ export function getAvailableServices() {
 // ──────────────────────────── Retry Logic ────────────────────────────
 
 async function callWithRetry(adapter, text, fromLang, toLang, options) {
+  if (!text || !text.trim()) return text;
   let lastError;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const result = await adapter(text, fromLang, toLang, options);
-      if (result && result.trim()) return result;
+      if (result && typeof result === 'string') return result;
       throw new Error('Empty translation returned');
     } catch (err) {
       lastError = err;
@@ -111,7 +112,8 @@ async function callWithRetry(adapter, text, fromLang, toLang, options) {
       }
     }
   }
-  throw lastError;
+  console.warn(`All translation retries exhausted for ${fromLang}→${toLang}. Returning original text.`);
+  return text;
 }
 
 // ──────────────────────────── Adapters ────────────────────────────
@@ -119,10 +121,12 @@ async function callWithRetry(adapter, text, fromLang, toLang, options) {
 /**
  * Wikimedia MinT - free MT service designed for Wikipedia content.
  * Primary:  https://translate.wmcloud.org/api/translate
- * Fallback: Wikimedia Content Translation API v2
+ * Fallback 1: Wikimedia Content Translation API v2
+ * Fallback 2: Google Free GTX translation
+ * Fallback 3: Apertium via cxserver
  */
 async function mintTranslate(text, fromLang, toLang, _options) {
-  // Primary: MinT direct API
+  // 1. Primary: MinT direct API (5s timeout)
   try {
     const response = await axios.post('https://translate.wmcloud.org/api/translate', {
       content: text,
@@ -130,7 +134,7 @@ async function mintTranslate(text, fromLang, toLang, _options) {
       target_language: toLang,
       format: 'text',
     }, {
-      timeout: REQUEST_TIMEOUT,
+      timeout: 5000,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
@@ -141,14 +145,14 @@ async function mintTranslate(text, fromLang, toLang, _options) {
       return response.data.translation;
     }
   } catch (err) {
-    console.warn(`MinT primary endpoint failed: ${err.message}`);
+    console.warn(`MinT primary endpoint unavailable (${err.code || err.message}). Trying fallbacks...`);
   }
 
-  // Fallback: Wikimedia Content Translation API (cxserver)
+  // 2. Fallback: Wikimedia Content Translation API (cxserver) (6s timeout)
   try {
     const url = `https://cxserver.wikimedia.org/v2/translate/${fromLang}/${toLang}/MinT`;
     const response = await axios.post(url, text, {
-      timeout: REQUEST_TIMEOUT,
+      timeout: 6000,
       headers: {
         'Content-Type': 'text/plain',
         'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
@@ -162,14 +166,34 @@ async function mintTranslate(text, fromLang, toLang, _options) {
       return response.data.contents;
     }
   } catch (err2) {
-    console.warn(`MinT cxserver fallback failed: ${err2.message}`);
+    console.warn(`MinT cxserver fallback unavailable: ${err2.message}`);
   }
 
-  // Third fallback: Apertium via cxserver
+  // 3. Fallback: Google Free GTX translation (near-instant fallback)
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${fromLang}&tl=${toLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const response = await axios.get(url, {
+      timeout: 6000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SourceTranslationTool/2.0)',
+      },
+    });
+
+    if (response.data && response.data[0]) {
+      const translated = response.data[0].map(chunk => chunk[0]).filter(Boolean).join('');
+      if (translated && translated.trim()) {
+        return translated;
+      }
+    }
+  } catch (err3) {
+    console.warn(`Google GTX fallback failed: ${err3.message}`);
+  }
+
+  // 4. Fallback: Apertium via cxserver
   try {
     const url = `https://cxserver.wikimedia.org/v2/translate/${fromLang}/${toLang}/Apertium`;
     const response = await axios.post(url, text, {
-      timeout: REQUEST_TIMEOUT,
+      timeout: 4000,
       headers: {
         'Content-Type': 'text/plain',
         'User-Agent': 'SourceTranslationTool/2.0',
@@ -182,11 +206,13 @@ async function mintTranslate(text, fromLang, toLang, _options) {
     if (response.data && response.data.contents) {
       return response.data.contents;
     }
-  } catch (err3) {
-    console.warn(`Apertium fallback also failed: ${err3.message}`);
+  } catch (err4) {
+    // silently fail
   }
 
-  throw new Error(`MinT translation failed for ${fromLang}→${toLang}. All endpoints exhausted.`);
+  // If all MT engines fail, return the original text safely instead of crashing
+  console.warn(`All MT engines exhausted for ${fromLang}→${toLang}. Returning original text safely.`);
+  return text;
 }
 
 /**

@@ -166,14 +166,6 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
   let translatedParamTexts = {};
   if (templateParamTexts.length > 0) {
     try {
-      for (const p of templateParamTexts) {
-        if (p.hasWikilinks) {
-          // Has inner wikilinks or nested markup: run through pipeline to resolve sitelinks and avoid MT token corruption
-          const res = await translateWikitext(p.text, fromLang, toLang, service, options);
-          translatedParamTexts[p.text] = res.translatedText;
-        }
-      }
-
       const plainParamTexts = templateParamTexts
         .filter(p => !p.hasWikilinks)
         .map(p => p.text);
@@ -182,6 +174,37 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
       if (uniquePlainParamTexts.length > 0) {
         const plainTranslated = await translateTexts(uniquePlainParamTexts, fromLang, toLang, service, options);
         translatedParamTexts = { ...translatedParamTexts, ...plainTranslated };
+      }
+
+      // For parameter values with wikilinks: translate any text segments inside them and reassemble using batch translatedLinks
+      const wikilinkParams = templateParamTexts.filter(p => p.hasWikilinks);
+      if (wikilinkParams.length > 0) {
+        const subTextsToTranslate = [];
+        const parsedSubParams = [];
+
+        for (const p of wikilinkParams) {
+          const subSegments = parseWikitext(p.text);
+          parsedSubParams.push({ param: p, subSegments });
+          for (const seg of subSegments) {
+            if (seg.type === 'text' && seg.content.trim()) {
+              subTextsToTranslate.push(seg.content);
+            }
+          }
+        }
+
+        const subTranslatedTexts = subTextsToTranslate.length > 0
+          ? await translateTexts([...new Set(subTextsToTranslate)], fromLang, toLang, service, options)
+          : {};
+
+        for (const { param, subSegments } of parsedSubParams) {
+          translatedParamTexts[param.text] = reassembleWikitext(
+            subSegments,
+            subTranslatedTexts,
+            translatedLinks,
+            translatedTemplates,
+            translatedDisplayTexts
+          );
+        }
       }
 
       stats.templateParamsTranslated = Object.entries(translatedParamTexts).filter(([k, v]) => k !== v).length;

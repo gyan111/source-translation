@@ -13,7 +13,7 @@ import axios from 'axios';
 const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
 const USER_AGENT = 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)';
 const BATCH_SIZE = 50; // Wikidata API limit per request
-const REQUEST_TIMEOUT = 15000;
+const REQUEST_TIMEOUT = 6000;
 
 // ──────────────────────────── LRU Cache ────────────────────────────
 

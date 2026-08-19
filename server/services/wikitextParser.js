@@ -292,9 +292,22 @@ export function extractCategoryTargets(segments) {
  * Extract all wikilink targets from segments for batch Wikidata lookup.
  */
 export function extractLinkTargets(segments) {
-  return segments
-    .filter(s => s.type === 'link' && s.target)
-    .map(s => s.target);
+  const targets = [];
+  for (const s of segments) {
+    if (s.type === 'link' && s.target) {
+      targets.push(s.target);
+    } else if (s.type === 'template' && s.content) {
+      const matches = s.content.matchAll(/\[\[\s*([^\]|]+?)(?:\|[^\]]+)?\s*\]\]/g);
+      for (const m of matches) {
+        const innerTarget = m[1].trim();
+        const lower = innerTarget.toLowerCase();
+        if (!lower.startsWith('category:') && !lower.startsWith('file:') && !lower.startsWith('image:') && !lower.startsWith('ଫାଇଲ:') && !lower.startsWith('चित्र:')) {
+          targets.push(innerTarget);
+        }
+      }
+    }
+  }
+  return [...new Set(targets)];
 }
 
 /**
