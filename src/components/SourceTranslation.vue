@@ -189,138 +189,135 @@
       </div>
     </div>
 
-    <!-- ===================== TEMPLATE-ONLY TRANSLATION BOX ===================== -->
-    <transition name="fade">
-      <div v-if="currentMode === 'template'" class="card-elevated p-4 sm:p-6 mb-5 border-t-4 border-amber-500 animate-fade-in">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-              <span class="material-icons-round text-lg">extension</span>
-            </div>
-            <div>
-              <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">Translate Wikipedia Template</h3>
-              <p class="text-xs text-slate-500 dark:text-zinc-400">Translates parameters and maps template name via Wikidata</p>
-            </div>
+    <!-- ===================== MODE VIEWS CONTAINER ===================== -->
+    <!-- Template-Only Mode -->
+    <div v-if="currentMode === 'template'" key="mode-template" class="card-elevated p-4 sm:p-6 mb-5 border-t-4 border-amber-500">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+            <span class="material-icons-round text-lg">extension</span>
           </div>
-
-          <!-- Language Selector for Template -->
-          <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
-            <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-            </select>
-            <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
-            <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-              <option value="" disabled>Target</option>
-              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-            </select>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">Translate Wikipedia Template</h3>
+            <p class="text-xs text-slate-500 dark:text-zinc-400">Translates parameters and maps template name via Wikidata</p>
           </div>
         </div>
 
-        <!-- Quick Samples -->
-        <div class="flex items-center gap-2 mb-3 flex-wrap text-xs">
-          <span class="text-slate-500 dark:text-zinc-400 font-medium">Quick Samples:</span>
-          <button @click="loadSampleTemplate('infobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
-            Infobox Person
-          </button>
-          <button @click="loadSampleTemplate('cite')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
-            Cite Web
-          </button>
-          <button @click="loadSampleTemplate('taxobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
-            Taxobox
-          </button>
-        </div>
-
-        <textarea
-          v-model="templateInput"
-          :dir="isSourceRtl ? 'rtl' : 'ltr'"
-          class="textarea-field w-full mb-3 font-mono text-xs"
-          rows="6"
-          placeholder="Paste template here, e.g. {{Infobox person | name = Albert Einstein | birth_place = Ulm, Germany | fields = Physics}}"
-        ></textarea>
-
-        <div class="flex flex-wrap gap-2 items-center">
-          <button @click="translateTemplateMode" :disabled="templateTranslating || !templateInput.trim()" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 disabled:opacity-50">
-            <span class="material-icons-round text-sm" :class="{ 'animate-spin': templateTranslating }">{{ templateTranslating ? 'refresh' : 'translate' }}</span>
-            {{ templateTranslating ? 'Translating Template...' : 'Translate Template' }}
-          </button>
-          <button v-if="templateTranslated" @click="copyTemplateResult" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
-            <span class="material-icons-round text-sm">content_copy</span>
-            {{ $t('toolbar.copyAll') }}
-          </button>
-        </div>
-
-        <!-- Template result & stats -->
-        <div v-if="templateTranslated" class="mt-4 animate-fade-in">
-          <div v-if="templateStats" class="flex flex-wrap gap-2 mb-2 text-xs">
-            <span class="px-2.5 py-1 rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400 font-medium">
-              Template: {{ templateStats.templateName }} → {{ templateStats.translatedName }}
-            </span>
-            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-              Parameters: {{ templateStats.paramsTranslated }}/{{ templateStats.paramsCount }} translated
-            </span>
-          </div>
-          <label class="field-label">Translated Template</label>
-          <textarea v-model="templateTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
+        <!-- Language Selector for Template -->
+        <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
+          <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+          </select>
+          <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
+          <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+            <option value="" disabled>Target</option>
+            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+          </select>
         </div>
       </div>
-    </transition>
 
-    <!-- ===================== WIKITEXT PASTE BOX ===================== -->
-    <transition name="fade">
-      <div v-if="currentMode === 'wikitext'" class="card-elevated p-4 sm:p-6 mb-5 border-t-4 border-emerald-500 animate-fade-in">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-              <span class="material-icons-round text-lg">code</span>
-            </div>
-            <div>
-              <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">{{ $t('toolbar.pasteWikitext') }}</h3>
-              <p class="text-xs text-slate-500 dark:text-zinc-400">Directly translate raw wikitext content</p>
-            </div>
+      <!-- Quick Samples -->
+      <div class="flex items-center gap-2 mb-3 flex-wrap text-xs">
+        <span class="text-slate-500 dark:text-zinc-400 font-medium">Quick Samples:</span>
+        <button @click="loadSampleTemplate('infobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
+          Infobox Person
+        </button>
+        <button @click="loadSampleTemplate('cite')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
+          Cite Web
+        </button>
+        <button @click="loadSampleTemplate('taxobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
+          Taxobox
+        </button>
+      </div>
+
+      <textarea
+        v-model="templateInput"
+        :dir="isSourceRtl ? 'rtl' : 'ltr'"
+        class="textarea-field w-full mb-3 font-mono text-xs"
+        rows="6"
+        placeholder="Paste template here, e.g. {{Infobox person | name = Albert Einstein | birth_place = Ulm, Germany | fields = Physics}}"
+      ></textarea>
+
+      <div class="flex flex-wrap gap-2 items-center">
+        <button @click="translateTemplateMode" :disabled="templateTranslating || !templateInput.trim()" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 disabled:opacity-50">
+          <span class="material-icons-round text-sm" :class="{ 'animate-spin': templateTranslating }">{{ templateTranslating ? 'refresh' : 'translate' }}</span>
+          {{ templateTranslating ? 'Translating Template...' : 'Translate Template' }}
+        </button>
+        <button v-if="templateTranslated" @click="copyTemplateResult" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
+          <span class="material-icons-round text-sm">content_copy</span>
+          {{ $t('toolbar.copyAll') }}
+        </button>
+      </div>
+
+      <!-- Template result & stats -->
+      <div v-if="templateTranslated" class="mt-4">
+        <div v-if="templateStats" class="flex flex-wrap gap-2 mb-2 text-xs">
+          <span class="px-2.5 py-1 rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400 font-medium">
+            Template: {{ templateStats.templateName }} → {{ templateStats.translatedName }}
+          </span>
+          <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+            Parameters: {{ templateStats.paramsTranslated }}/{{ templateStats.paramsCount }} translated
+          </span>
+        </div>
+        <label class="field-label">Translated Template</label>
+        <textarea v-model="templateTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
+      </div>
+    </div>
+
+    <!-- Raw Wikitext Mode -->
+    <div v-else-if="currentMode === 'wikitext'" key="mode-wikitext" class="card-elevated p-4 sm:p-6 mb-5 border-t-4 border-emerald-500">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+            <span class="material-icons-round text-lg">code</span>
           </div>
-
-          <!-- Language Selector for Wikitext -->
-          <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
-            <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-            </select>
-            <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
-            <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-              <option value="" disabled>Target</option>
-              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-            </select>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">{{ $t('toolbar.pasteWikitext') }}</h3>
+            <p class="text-xs text-slate-500 dark:text-zinc-400">Directly translate raw wikitext content</p>
           </div>
         </div>
 
-        <textarea
-          v-model="wikitextInput"
-          :dir="isSourceRtl ? 'rtl' : 'ltr'"
-          class="textarea-field w-full mb-3 font-mono text-xs"
-          rows="6"
-          placeholder="Paste raw wikitext here..."
-        ></textarea>
-
-        <div class="flex flex-wrap gap-2 items-center">
-          <button @click="translateWikitextMode" :disabled="wikitextTranslating || !wikitextInput.trim()" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 disabled:opacity-50">
-            <span class="material-icons-round text-sm" :class="{ 'animate-spin': wikitextTranslating }">{{ wikitextTranslating ? 'refresh' : 'translate' }}</span>
-            {{ wikitextTranslating ? $t('paragraph.translating') : $t('toolbar.translate') }}
-          </button>
-          <button v-if="wikitextTranslated" @click="copyWikitextResult" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
-            <span class="material-icons-round text-sm">content_copy</span>
-            {{ $t('toolbar.copyAll') }}
-          </button>
-        </div>
-
-        <!-- Wikitext result -->
-        <div v-if="wikitextTranslated" class="mt-4 animate-fade-in">
-          <label class="field-label">{{ $t('toolbar.translationResult') }}</label>
-          <textarea v-model="wikitextTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
+        <!-- Language Selector for Wikitext -->
+        <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
+          <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+          </select>
+          <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
+          <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+            <option value="" disabled>Target</option>
+            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+          </select>
         </div>
       </div>
-    </transition>
 
-    <!-- ===================== ARTICLE SECTIONS & PROGRESS ===================== -->
-    <div v-if="currentMode === 'article'">
+      <textarea
+        v-model="wikitextInput"
+        :dir="isSourceRtl ? 'rtl' : 'ltr'"
+        class="textarea-field w-full mb-3 font-mono text-xs"
+        rows="6"
+        placeholder="Paste raw wikitext here..."
+      ></textarea>
+
+      <div class="flex flex-wrap gap-2 items-center">
+        <button @click="translateWikitextMode" :disabled="wikitextTranslating || !wikitextInput.trim()" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 disabled:opacity-50">
+          <span class="material-icons-round text-sm" :class="{ 'animate-spin': wikitextTranslating }">{{ wikitextTranslating ? 'refresh' : 'translate' }}</span>
+          {{ wikitextTranslating ? $t('paragraph.translating') : $t('toolbar.translate') }}
+        </button>
+        <button v-if="wikitextTranslated" @click="copyWikitextResult" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
+          <span class="material-icons-round text-sm">content_copy</span>
+          {{ $t('toolbar.copyAll') }}
+        </button>
+      </div>
+
+      <!-- Wikitext result -->
+      <div v-if="wikitextTranslated" class="mt-4">
+        <label class="field-label">{{ $t('toolbar.translationResult') }}</label>
+        <textarea v-model="wikitextTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
+      </div>
+    </div>
+
+    <!-- Article Sections & Mode Content -->
+    <div v-else-if="currentMode === 'article'" key="mode-article">
       <!-- Stats bar shown when paragraphs are loaded -->
       <div v-if="paragraphs.length" class="flex flex-wrap items-center gap-3 mb-4 text-xs text-slate-500 dark:text-zinc-400">
         <span class="flex items-center gap-1">
