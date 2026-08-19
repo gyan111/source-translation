@@ -12,6 +12,7 @@
 import HeaderBar from './components/HeaderBar.vue';
 import SourceTranslation from './components/SourceTranslation.vue';
 import FooterBar from './components/FooterBar.vue';
+import { isRtlLanguage } from './i18n.js';
 
 export default {
   name: 'App',
@@ -26,6 +27,11 @@ export default {
       user: null,
     };
   },
+  watch: {
+    '$i18n.locale'(newLocale) {
+      this.updateDocumentDirection(newLocale);
+    },
+  },
   methods: {
     toggleDarkMode() {
       this.isDark = !this.isDark;
@@ -38,6 +44,11 @@ export default {
       } else {
         document.documentElement.classList.remove('dark');
       }
+    },
+    updateDocumentDirection(locale) {
+      const isRtl = isRtlLanguage(locale);
+      document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
+      document.documentElement.setAttribute('lang', locale || 'en');
     },
     async fetchUser() {
       try {
@@ -54,6 +65,9 @@ export default {
     },
   },
   created() {
+    // Apply UI RTL / LTR direction based on current locale
+    this.updateDocumentDirection(this.$i18n.locale);
+
     // Restore dark mode preference
     const saved = localStorage.getItem('dark-mode');
     if (saved === 'true') {

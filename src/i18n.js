@@ -2084,6 +2084,16 @@ export const uiLanguageNames = {
   ar: 'العربية',
 };
 
+// List of Right-to-Left (RTL) language codes
+export const RTL_LANGUAGES = ['ar', 'fa', 'ur', 'he', 'sd', 'ks', 'pnb', 'skr', 'ps', 'ug', 'ckb'];
+
+/**
+ * Check whether a language code uses Right-to-Left script
+ * @param {string} code 
+ * @returns {boolean}
+ */
+export const isRtlLanguage = (code) => RTL_LANGUAGES.includes((code || '').toLowerCase());
+
 const i18n = createI18n({
   legacy: false,
   locale: localStorage.getItem('ui-locale') || 'en',

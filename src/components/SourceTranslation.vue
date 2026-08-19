@@ -232,6 +232,7 @@
 
         <textarea
           v-model="templateInput"
+          :dir="isSourceRtl ? 'rtl' : 'ltr'"
           class="textarea-field w-full mb-3 font-mono text-xs"
           rows="6"
           placeholder="Paste template here, e.g. {{Infobox person | name = Albert Einstein | birth_place = Ulm, Germany | fields = Physics}}"
@@ -259,7 +260,7 @@
             </span>
           </div>
           <label class="field-label">Translated Template</label>
-          <textarea v-model="templateTranslated" class="textarea-field font-mono text-xs" rows="6"></textarea>
+          <textarea v-model="templateTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
         </div>
       </div>
     </transition>
@@ -293,6 +294,7 @@
 
         <textarea
           v-model="wikitextInput"
+          :dir="isSourceRtl ? 'rtl' : 'ltr'"
           class="textarea-field w-full mb-3 font-mono text-xs"
           rows="6"
           placeholder="Paste raw wikitext here..."
@@ -312,7 +314,7 @@
         <!-- Wikitext result -->
         <div v-if="wikitextTranslated" class="mt-4 animate-fade-in">
           <label class="field-label">{{ $t('toolbar.translationResult') }}</label>
-          <textarea v-model="wikitextTranslated" class="textarea-field font-mono text-xs" rows="6"></textarea>
+          <textarea v-model="wikitextTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
         </div>
       </div>
     </transition>
@@ -352,6 +354,8 @@
             :source="para.source"
             :translation="para.translation"
             :status="para.status"
+            :isSourceRtl="isSourceRtl"
+            :isTargetRtl="isTargetRtl"
             @translate-paragraph="translateParagraph"
             @update-translation="updateTranslation"
           />
@@ -369,47 +373,51 @@
               type="button"
               @click="publishDestination = 'mainspace'"
               :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all',
+                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1',
                 publishDestination === 'mainspace'
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700'
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-white/[0.06] hover:bg-slate-200'
               ]"
             >
-              Mainspace (Live Article)
+              <span class="material-icons-round text-xs">public</span>
+              Mainspace (Direct Page)
             </button>
             <button
               type="button"
               @click="publishDestination = 'sandbox'"
               :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all',
+                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1',
                 publishDestination === 'sandbox'
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-white/[0.06] hover:bg-slate-200'
               ]"
             >
-              User Sandbox
+              <span class="material-icons-round text-xs">science</span>
+              User Sandbox (Draft)
             </button>
             <button
               type="button"
               @click="publishDestination = 'draft'"
               :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all',
+                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1',
                 publishDestination === 'draft'
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-white/[0.06] hover:bg-slate-200'
               ]"
             >
+              <span class="material-icons-round text-xs">edit_note</span>
               Draft Namespace
             </button>
           </div>
 
-          <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-            <div class="w-full sm:w-auto flex-1 max-w-md">
-              <label class="field-label">Target Page Title ({{ formattedPublishTarget }})</label>
+          <!-- Target Page Title Input & Publish Button -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div class="flex-1 relative">
+              <span class="material-icons-round absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">edit</span>
               <input
                 v-model="publishTitle"
                 type="text"
-                class="input-field w-full text-xs"
+                class="input-field pl-9 py-2 text-xs font-medium"
                 :placeholder="publishPlaceholder"
                 :disabled="isPublishing"
               />
@@ -524,6 +532,8 @@
       :previewHtml="previewHtml"
       :sourceWikitext="rawWikitext || paragraphs.map(p => p.source).join('\n\n')"
       :translatedWikitext="fullTranslatedText"
+      :isSourceRtl="isSourceRtl"
+      :isTargetRtl="isTargetRtl"
       @close-preview="closePreview"
     />
   </div>
@@ -535,6 +545,7 @@ import ProgressBar from './ProgressBar.vue';
 import PreviewModal from './PreviewModal.vue';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
+import { isRtlLanguage } from '../i18n.js';
 
 export default {
   name: 'SourceTranslation',
@@ -685,6 +696,12 @@ export default {
   },
 
   computed: {
+    isSourceRtl() {
+      return isRtlLanguage(this.fromLanguage);
+    },
+    isTargetRtl() {
+      return isRtlLanguage(this.toLanguage);
+    },
     currentServiceDisplayName() {
       const map = {
         mint: 'Wikimedia MinT (Free)',

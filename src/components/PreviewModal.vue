@@ -52,7 +52,7 @@
             </div>
 
             <!-- Rendered HTML Tab -->
-            <div v-else-if="activeTab === 'rendered'" v-html="previewHtml" class="prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm"></div>
+            <div v-else-if="activeTab === 'rendered'" v-html="previewHtml" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm"></div>
 
             <!-- Side-by-Side Diff Tab -->
             <div v-else-if="activeTab === 'diff'" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
@@ -61,7 +61,7 @@
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Original Wikitext</span>
                 </div>
-                <pre class="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200/60 dark:border-white/[0.06] text-xs font-mono text-slate-700 dark:text-zinc-300 overflow-x-auto whitespace-pre-wrap flex-1 max-h-[60vh]">{{ sourceWikitext || 'No source content' }}</pre>
+                <pre :dir="isSourceRtl ? 'rtl' : 'ltr'" class="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200/60 dark:border-white/[0.06] text-xs font-mono text-slate-700 dark:text-zinc-300 overflow-x-auto whitespace-pre-wrap flex-1 max-h-[60vh]">{{ sourceWikitext || 'No source content' }}</pre>
               </div>
 
               <!-- Translated -->
@@ -69,7 +69,7 @@
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Translated Wikitext</span>
                 </div>
-                <pre class="p-3.5 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 text-xs font-mono text-slate-700 dark:text-zinc-200 overflow-x-auto whitespace-pre-wrap flex-1 max-h-[60vh]">{{ translatedWikitext || 'No translated content' }}</pre>
+                <pre :dir="isTargetRtl ? 'rtl' : 'ltr'" class="p-3.5 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 text-xs font-mono text-slate-700 dark:text-zinc-200 overflow-x-auto whitespace-pre-wrap flex-1 max-h-[60vh]">{{ translatedWikitext || 'No translated content' }}</pre>
               </div>
             </div>
           </div>
@@ -93,6 +93,14 @@ export default {
     translatedWikitext: {
       type: String,
       default: '',
+    },
+    isSourceRtl: {
+      type: Boolean,
+      default: false,
+    },
+    isTargetRtl: {
+      type: Boolean,
+      default: false,
     },
   },
   data() {

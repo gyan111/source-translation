@@ -37,6 +37,7 @@
         <textarea
           :value="source"
           readonly
+          :dir="isSourceRtl ? 'rtl' : 'ltr'"
           class="textarea-field flex-1 bg-slate-100/70 dark:bg-zinc-950/60 text-slate-700 dark:text-zinc-300 min-h-[110px] border-slate-200 dark:border-white/[0.06] font-mono text-xs leading-relaxed focus:ring-0 focus:border-slate-300 dark:focus:border-white/10"
           rows="4"
         ></textarea>
@@ -64,6 +65,7 @@
           :value="translation"
           @input="$emit('update-translation', index, $event.target.value)"
           @click="handleTranslationClick"
+          :dir="isTargetRtl ? 'rtl' : 'ltr'"
           class="textarea-field flex-1 min-h-[110px] bg-white dark:bg-zinc-900/90 border-primary-200/90 dark:border-primary-500/25 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-2 focus:ring-primary-500/20 text-slate-900 dark:text-zinc-100 font-sans text-sm shadow-sm"
           :class="{ 'cursor-pointer placeholder:text-primary-400/60 dark:placeholder:text-primary-400/40': !translation && status === 'pending' }"
           rows="4"
@@ -84,6 +86,14 @@ export default {
     status: {
       type: String,
       default: 'pending', // 'pending' | 'translating' | 'translated' | 'error'
+    },
+    isSourceRtl: {
+      type: Boolean,
+      default: false,
+    },
+    isTargetRtl: {
+      type: Boolean,
+      default: false,
     },
   },
   methods: {
