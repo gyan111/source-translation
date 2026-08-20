@@ -51,8 +51,8 @@
               <p class="text-xs text-slate-500 dark:text-zinc-400">{{ $t('preview.loading') }}</p>
             </div>
 
-            <!-- Rendered HTML Tab -->
-            <div v-else-if="activeTab === 'rendered'" v-html="previewHtml" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm"></div>
+            <!-- Rendered HTML Tab (Styled to match target Wikipedia / Vector skin) -->
+            <div v-else-if="activeTab === 'rendered'" v-html="previewHtml" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="wiki-preview prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed"></div>
 
             <!-- Side-by-Side Diff Tab -->
             <div v-else-if="activeTab === 'diff'" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
@@ -127,10 +127,258 @@ export default {
 };
 </script>
 
-<style scoped>
-.border-3 {
-  border-width: 3px;
+<style>
+/* Vector 2022 / MediaWiki Authenticity Styles Scoped to Preview */
+.wiki-preview {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Liberation Sans", Arial, sans-serif;
+  color: #202122;
 }
+.dark .wiki-preview {
+  color: #f4f4f5;
+}
+
+/* Headings with standard MediaWiki underlines */
+.wiki-preview h1,
+.wiki-preview h2 {
+  border-bottom: 1px solid #a2a9b1;
+  padding-bottom: 0.25em;
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  font-weight: 500;
+}
+.dark .wiki-preview h1,
+.dark .wiki-preview h2 {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.wiki-preview h3,
+.wiki-preview h4 {
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.3em;
+}
+
+/* Links & Red Links */
+.wiki-preview a {
+  color: #3366cc;
+  text-decoration: none;
+}
+.dark .wiki-preview a {
+  color: #60a5fa;
+}
+.wiki-preview a:hover {
+  text-decoration: underline;
+}
+.wiki-preview a.new,
+.wiki-preview a.redlink {
+  color: #ba0000;
+}
+.dark .wiki-preview a.new,
+.dark .wiki-preview a.redlink {
+  color: #f87171;
+}
+
+/* Floating Infobox Card */
+.wiki-preview .infobox,
+.wiki-preview table.infobox,
+.wiki-preview .infobox_v2,
+.wiki-preview .infobox_v3 {
+  float: right;
+  clear: right;
+  margin: 0 0 1.2em 1.5em;
+  width: 23em;
+  max-width: 100%;
+  border: 1px solid #c8ccd1;
+  background-color: #f8f9fa;
+  color: #202122;
+  padding: 0.35em;
+  font-size: 0.85em;
+  line-height: 1.5em;
+  border-collapse: collapse;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+[dir="rtl"] .wiki-preview .infobox,
+[dir="rtl"] .wiki-preview table.infobox,
+[dir="rtl"] .wiki-preview .infobox_v2,
+[dir="rtl"] .wiki-preview .infobox_v3 {
+  float: left;
+  clear: left;
+  margin: 0 1.5em 1.2em 0;
+}
+.dark .wiki-preview .infobox,
+.dark .wiki-preview table.infobox,
+.dark .wiki-preview .infobox_v2,
+.dark .wiki-preview .infobox_v3 {
+  background-color: #18181b;
+  border-color: #3f3f46;
+  color: #f4f4f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.wiki-preview .infobox th,
+.wiki-preview .infobox td {
+  vertical-align: top;
+  padding: 0.3em 0.5em;
+  border: 1px solid #eaecf0;
+}
+.dark .wiki-preview .infobox th,
+.dark .wiki-preview .infobox td {
+  border-color: #27272a;
+}
+.wiki-preview .infobox th {
+  text-align: left;
+  background-color: #eaecf0;
+  font-weight: 600;
+}
+[dir="rtl"] .wiki-preview .infobox th {
+  text-align: right;
+}
+.dark .wiki-preview .infobox th {
+  background-color: #27272a;
+  color: #fafafa;
+}
+
+/* Floating Image Thumbnails */
+.wiki-preview .thumb,
+.wiki-preview .tright {
+  float: right;
+  clear: right;
+  margin-bottom: 0.8em;
+  margin-left: 1.4em;
+  background-color: #f8f9fa;
+  border: 1px solid #c8ccd1;
+  padding: 4px;
+  font-size: 0.85em;
+  border-radius: 6px;
+}
+[dir="rtl"] .wiki-preview .thumb,
+[dir="rtl"] .wiki-preview .tright {
+  float: left;
+  clear: left;
+  margin-right: 1.4em;
+  margin-left: 0;
+}
+.dark .wiki-preview .thumb,
+.dark .wiki-preview .tright {
+  background-color: #18181b;
+  border-color: #3f3f46;
+}
+.wiki-preview .tleft {
+  float: left;
+  clear: left;
+  margin-bottom: 0.8em;
+  margin-right: 1.4em;
+  background-color: #f8f9fa;
+  border: 1px solid #c8ccd1;
+  padding: 4px;
+  font-size: 0.85em;
+  border-radius: 6px;
+}
+[dir="rtl"] .wiki-preview .tleft {
+  float: right;
+  clear: right;
+  margin-left: 1.4em;
+  margin-right: 0;
+}
+.dark .wiki-preview .tleft {
+  background-color: #18181b;
+  border-color: #3f3f46;
+}
+.wiki-preview .thumbcaption {
+  border: none;
+  text-align: left;
+  line-height: 1.4em;
+  padding: 4px 2px 2px 2px;
+  color: #54595d;
+}
+.dark .wiki-preview .thumbcaption {
+  color: #a1a1aa;
+}
+
+/* Wikitables */
+.wiki-preview table.wikitable {
+  background-color: #f8f9fa;
+  color: #202122;
+  margin: 1em 0;
+  border: 1px solid #a2a9b1;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  width: 100%;
+}
+.dark .wiki-preview table.wikitable {
+  background-color: #18181b;
+  border-color: #3f3f46;
+  color: #f4f4f5;
+}
+.wiki-preview table.wikitable > tr > th,
+.wiki-preview table.wikitable > * > tr > th {
+  background-color: #eaecf0;
+  text-align: center;
+  padding: 0.4em 0.6em;
+  border: 1px solid #a2a9b1;
+  font-weight: 600;
+}
+.dark .wiki-preview table.wikitable > tr > th,
+.dark .wiki-preview table.wikitable > * > tr > th {
+  background-color: #27272a;
+  border-color: #3f3f46;
+}
+.wiki-preview table.wikitable > tr > td,
+.wiki-preview table.wikitable > * > tr > td {
+  padding: 0.4em 0.6em;
+  border: 1px solid #a2a9b1;
+}
+.dark .wiki-preview table.wikitable > tr > td,
+.dark .wiki-preview table.wikitable > * > tr > td {
+  border-color: #3f3f46;
+}
+
+/* Disambiguation & Hatnotes */
+.wiki-preview .hatnote,
+.wiki-preview .dablink,
+.wiki-preview .rellink {
+  font-style: italic;
+  padding: 0.35em 0.7em 0.35em 1.6em;
+  margin-bottom: 0.6em;
+  color: #54595d;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+.dark .wiki-preview .hatnote,
+.dark .wiki-preview .dablink,
+.dark .wiki-preview .rellink {
+  color: #a1a1aa;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Citations & Reference Lists */
+.wiki-preview .reference {
+  font-size: 0.8em;
+  line-height: 1;
+  vertical-align: super;
+  padding-left: 1px;
+}
+.wiki-preview .mw-references-wrap,
+.wiki-preview .references {
+  font-size: 0.85em;
+  line-height: 1.5;
+  column-count: 2;
+  column-gap: 2em;
+}
+@media (max-width: 640px) {
+  .wiki-preview .mw-references-wrap,
+  .wiki-preview .references {
+    column-count: 1;
+  }
+  .wiki-preview .infobox,
+  .wiki-preview table.infobox {
+    float: none;
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 .modal-enter-active,
 .modal-leave-active {
   transition: all 0.2s ease;

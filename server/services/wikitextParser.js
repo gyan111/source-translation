@@ -326,21 +326,99 @@ export function extractTemplateNames(segments) {
     .filter(name => name && !name.startsWith('#') && !name.startsWith('{'));
 }
 
+export const TECHNICAL_TEMPLATES = new Set([
+  'coord', 'coord2', 'coor', 'coor dms', 'coor dm', 'coordinates',
+  'convert', 'url', 'flag', 'flagicon', 'flagcountry', 'lang', 'ipa', 'nihongo',
+  'reflist', 'references', 'authority control', 'autorite', 'normdaten', 'dmy', 'mdy',
+  'use dmy dates', 'use mdy dates', 'use indian english', 'short description', 'redirect',
+  'good article', 'featured article', 'pp-extended', 'pp-move'
+]);
+
+export const TEMPLATE_PARAM_ALIASES = {
+  fr: {
+    // English Infobox settlement -> French Infobox Localité / Ville
+    name: 'nom',
+    official_name: 'nom',
+    settlement_type: 'statut',
+    subdivision_name: 'pays',
+    subdivision_name1: 'subdivision',
+    subdivision_name2: 'subdivision2',
+    population_total: 'population',
+    population_as_of: 'annee_pop',
+    elevation_m: 'altitude',
+    area_total_km2: 'superficie',
+    postal_code: 'code postal',
+    image_skyline: 'image',
+    image_caption: 'legende',
+    // English Infobox person -> French Infobox Biographie
+    birth_date: 'date de naissance',
+    birth_place: 'lieu de naissance',
+    death_date: 'date de décès',
+    death_place: 'lieu de décès',
+    nationality: 'nationalité',
+    occupation: 'profession',
+  },
+};
+
+const PROTECTED_PARAM_NAMES = new Set([
+  'image', 'image_skyline', 'image_flag', 'image_seal', 'image_map', 'image_coat_of_arms',
+  'image_blank_emblem', 'signature', 'signature_alt', 'filename', 'file', 'logo', 'map',
+  'pushpin_map', 'sound', 'audio', 'video', 'recording', 'coat_of_arms', 'flag', 'seal', 'icon',
+  'registration_plate', 'postal_code', 'area_code', 'utc_offset', 'utc_offset1', 'coordinates',
+  'coordinates_display', 'coordinates_footnotes', 'mapframe', 'mapsize', 'imagesize', 'unit_pref',
+  'elevation_m', 'elevation_ft', 'area_rank', 'population_rank', 'website', 'url', 'doi', 'isbn',
+  'issn', 'pmid', 'pmc', 'arxiv'
+]);
+
+export const CATEGORY_PREFIX_MAP = {
+  ar: 'تصنيف', as: 'শ্ৰেণী', bn: 'বিষয়শ্রেণী', bho: 'श्रेणी', br: 'Rummad', ca: 'Categoria',
+  cs: 'Kategorie', cy: 'Categori', da: 'Kategori', de: 'Kategorie', el: 'Κατηγορία', en: 'Category',
+  eo: 'Kategorio', es: 'Categoría', et: 'Kategooria', eu: 'Kategoria', fa: 'رده', fi: 'Luokka',
+  fr: 'Catégorie', ga: 'Catagóir', gl: 'Categoría', gu: 'શ્રેણી', he: 'קטגוריה', hi: 'श्रेणी',
+  hr: 'Kategorija', hu: 'Kategória', hy: 'Կատեգորիա', id: 'Kategori', is: 'Flokkur', it: 'Categoria',
+  ja: 'Category', jv: 'Kategori', ka: 'კატեգորիა', kn: 'ವರ್ಗ', ko: '분류', ku: 'Kategorî',
+  la: 'Categoria', lt: 'Kategorija', lv: 'Kategorija', mai: 'श्रेणी', ml: 'വർഗ്ഗം', mn: 'Ангилал',
+  mr: 'वर्ग', ms: 'Kategori', my: 'ကဏ္ဍ', ne: 'श्रेणी', nl: 'Categorie', nn: 'Kategori',
+  no: 'Kategori', or: 'ଶ୍ରেਣੀ', pa: 'ਸ਼੍ਰেਣੀ', pl: 'Kategoria', ps: 'وېشنيزه', pt: 'Categoria',
+  ro: 'Categorie', ru: 'Категория', sa: 'वर्गः', sat: 'ᱛᱷᱚᱠ', sd: 'زمرو', sk: 'Kategória',
+  sl: 'Kategorija', sq: 'Kategoria', sr: 'Категорија', su: 'Kategori', sv: 'Kategori', sw: 'Jamii',
+  ta: 'பகுப்பு', te: 'వర్గం', th: 'หมวดหมู่', tl: 'Kategorya', tr: 'Kategori', uk: 'Категорія',
+  ur: 'زمرہ', vi: 'Thể loại', yi: 'קאַטעגאָריע', zh: 'Category',
+};
+
+export const REFLIST_TEMPLATE_MAP = {
+  ar: 'مراجع', bn: 'सूत्र', de: 'Einzelnachweise', en: 'Reflist', es: 'Referencias', fa: 'پانویس',
+  fr: 'Références', gu: 'સંદર્ભ', he: 'הערות שוליים', hi: 'सन्दर्भ', it: 'Note', ja: 'Reflist',
+  kn: 'ಉಲ್ಲೇಖಗಳು', ml: 'അവലംബം', mr: 'संदर्भ', or: 'ଆଧାର', pa: 'ਹਵਾਲੇ', pt: 'Referências',
+  ru: 'Примечания', ta: 'சான்றுகள்', te: 'మూలాలు', ur: 'حوالہ جات', zh: 'Reflist',
+};
+
 /**
  * Determines whether a template parameter value represents translatable text.
  */
-export function isTranslatableParamValue(val) {
+export function isTranslatableParamValue(val, paramName = '') {
   if (!val || typeof val !== 'string') return false;
   const t = val.trim();
   if (t.length === 0) return false;
+
+  // Protect known media/file/technical parameter keys
+  const normalizedKey = (paramName || '').toLowerCase().replace(/[\s_-]+/g, '_');
+  if (PROTECTED_PARAM_NAMES.has(normalizedKey) || normalizedKey.startsWith('image_') || normalizedKey.endsWith('_image') || normalizedKey.endsWith('_filename') || normalizedKey.endsWith('_file')) {
+    return false;
+  }
+
+  // Protect any string ending in a media file extension (including filenames with spaces, commas, dates)
+  if (/\.(?:jpg|jpeg|png|svg|gif|webp|tiff|tif|pdf|ogg|oga|ogv|mp3|mp4|wav|flac|webm|avi|mov)$/i.test(t)) {
+    return false;
+  }
+
   if (/^\d+$/.test(t)) return false;
-  if (/^\d+\s*(?:px|em|%|km|m|cm|kg|g|°|ft|in)$/i.test(t)) return false;
+  if (/^\d+\s*(?:px|em|%|km|m|cm|kg|g|°|ft|in|ha|acre|acres|sqmi|sqkm)$/i.test(t)) return false;
   if (/^\d+\s*[×x]\s*\d+\s*(?:px)?$/i.test(t)) return false;
   if (/^\d{4}-\d{2}-\d{2}/.test(t)) return false;
   if (/^\+?\d[\d\s-]{4,}$/.test(t)) return false;
   if (/^https?:\/\//i.test(t)) return false;
   if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(t)) return false;
-  if (/^[A-Za-z0-9_.-]+\.(?:jpg|jpeg|png|svg|gif|webp|tiff|pdf|ogg|mp3|mp4)$/i.test(t)) return false;
   return true;
 }
 
@@ -356,10 +434,17 @@ export function extractTemplateParamTexts(segments) {
 
     try {
       const parsed = parseTemplate(seg.content);
+      const lowerName = parsed.name.toLowerCase().trim();
+
+      // Skip technical templates whose parameters should not be sent to text MT
+      if (TECHNICAL_TEMPLATES.has(lowerName) || lowerName.startsWith('coord') || lowerName.startsWith('use ')) {
+        return;
+      }
+
       parsed.params.forEach((param, paramIdx) => {
         if (param.isComment) return;
         const val = param.value.trim();
-        if (isTranslatableParamValue(val)) {
+        if (isTranslatableParamValue(val, param.name)) {
           paramTexts.push({
             segmentIndex: segIdx,
             paramIndex: paramIdx,
@@ -412,6 +497,7 @@ function splitTemplateParams(str) {
  * Normalizes wikitext syntax after machine translation:
  *  - Fixes spaces in headings introduced by MT: "= = Heading = =" -> "== Heading =="
  *  - Ensures headings are separated on their own clean lines
+ *  - Enforces clean spacing around [[wikilinks]] in prose
  *  - Trims inner wikilink spacing
  *  - Strips any remaining unexpanded null/placeholder byte tokens
  */
@@ -449,6 +535,26 @@ export function normalizeWikitextSyntax(wikitext) {
   result = result.replace(/\[\[\s*([^\]|]+?)\s*\|\s*([^\]]+?)\s*\]\]/g, '[[$1|$2]]');
   result = result.replace(/\[\[\s*([^\]|]+?)\s*\]\]/g, '[[$1]]');
 
+  // Fix missing space between prose words and opening wikilinks: e.g. "ਪਿੰਡ[[ਕਟକ]]" or "le[[Père" -> "ਪਿੰਡ [[ਕਟକ]]", "le [[Père"
+  result = result.replace(/([^\s\[{=(|:;«"'/\p{P}])(\[\[)/gu, '$1 $2');
+
+  // Fix missing space between closing wikilinks and following prose words: e.g. "[[ਕਟକ]]ਸ਼ਹਿਰ" -> "[[ਕਟକ]] ਸ਼ਹਿਰ"
+  result = result.replace(/(\]\])([^\s\],.:;?!)}'»"/\p{P}])/gu, '$1 $2');
+
+  // Fix coordinate format converted to time by MT (e.g. 20h50 -> 20.50 inside Coord templates)
+  result = result.replace(/(\{\{[Cc]oord[^}]*?)(\d+)h(\d+)/g, '$1$2.$3');
+
+  // Fix interwiki prefix translated to French word "ou"
+  result = result.replace(/\[\[:ou:/g, '[[:or:');
+
+  // Fix political party translated to "Fête" in French
+  result = result.replace(/\bFête\s+([A-ZÀ-Ý][a-zà-ÿ]+(?:\s+[A-ZÀ-Ý][a-zà-ÿ]+)*)/g, (match, p1) => {
+    if (['Janata', 'Bharatiya', 'Congress', 'Travailliste', 'Socialiste', 'Démocrate', 'Républicain'].includes(p1.split(' ')[0])) {
+      return `Parti ${p1}`;
+    }
+    return match;
+  });
+
   // Remove any stray placeholder artifacts (e.g. \x00COMMENT_0\x00 or ◆COMMENT_0◆)
   result = result.replace(/\x00[A-Z]+_\d+\x00/g, '');
   result = result.replace(/◆[A-Z]+_\d+◆/g, '');
@@ -469,6 +575,7 @@ export function normalizeWikitextSyntax(wikitext) {
  * @param {Object} translatedDisplayTexts - Map of display text → translated display text
  * @param {Object} translatedParamTexts - Map of param text → translated param text (optional)
  * @param {Object} translatedCategories - Map of category target → translated category target
+ * @param {Object} options - { missingLinkStrategy: 'translate'|'ill'|'plain'|'keep_source', fromLang, toLang, unresolvedTranslatedTargets }
  */
 export function reassembleWikitext(
   segments,
@@ -477,9 +584,14 @@ export function reassembleWikitext(
   translatedTemplates,
   translatedDisplayTexts,
   translatedParamTexts = {},
-  translatedCategories = {}
+  translatedCategories = {},
+  options = {}
 ) {
   const parts = [];
+  const missingLinkStrategy = options.missingLinkStrategy || 'translate';
+  const fromLang = options.fromLang || 'en';
+  const toLang = options.toLang || '';
+  const unresolvedTranslatedTargets = options.unresolvedTranslatedTargets || {};
 
   for (const seg of segments) {
     switch (seg.type) {
@@ -498,26 +610,64 @@ export function reassembleWikitext(
       }
 
       case 'link': {
-        const newTarget = translatedLinks[seg.target] ?? seg.target;
-        if (seg.display) {
-          const newDisplay = translatedDisplayTexts[seg.display] ?? seg.display;
-          parts.push(`[[${newTarget}|${newDisplay}]]`);
-        } else {
-          // If link target changed, add piped link with translated display
-          if (newTarget !== seg.target) {
+        const resolvedTarget = translatedLinks[seg.target];
+        const isWikidataResolved = resolvedTarget && resolvedTarget !== seg.target;
+
+        if (isWikidataResolved) {
+          // Article exists on target wiki (Wikidata resolved)
+          const newTarget = resolvedTarget;
+          if (seg.display) {
+            const newDisplay = translatedDisplayTexts[seg.display] ?? seg.display;
+            parts.push(`[[${newTarget}|${newDisplay}]]`);
+          } else {
             let display = translatedDisplayTexts[seg.target] ?? newTarget;
             const parenMatch = display.match(/^(.+?)\s*\([^)]+\)$/);
             if (parenMatch && parenMatch[1].trim()) {
               display = parenMatch[1].trim();
             }
             parts.push(`[[${newTarget}|${display}]]`);
-          } else {
-            // Pipe trick: auto-generate piped label for titles with disambiguation brackets
-            const parenMatch = newTarget.match(/^(.+?)\s*\([^)]+\)$/);
-            if (parenMatch && parenMatch[1].trim()) {
-              parts.push(`[[${newTarget}|${parenMatch[1].trim()}]]`);
+          }
+        } else {
+          // Article does NOT exist on target wiki (missing Wikidata sitelink)
+          const hasUnresolvedTranslation = unresolvedTranslatedTargets && unresolvedTranslatedTargets[seg.target];
+          const translatedTarget = hasUnresolvedTranslation ? unresolvedTranslatedTargets[seg.target] : seg.target;
+          const displaySource = seg.display || seg.target;
+          const translatedDisplay = translatedDisplayTexts[displaySource] ?? translatedTarget;
+
+          if (missingLinkStrategy === 'plain' && hasUnresolvedTranslation) {
+            // Strip link brackets, keep plain translated text
+            parts.push(translatedDisplay);
+          } else if (missingLinkStrategy === 'ill' && hasUnresolvedTranslation) {
+            // Interlanguage template
+            if (toLang === 'fr') {
+              parts.push(`{{Lien|trad=${seg.target}|titre=${translatedTarget}|lang=${fromLang}}}`);
             } else {
-              parts.push(`[[${newTarget}]]`);
+              parts.push(`{{ill|${translatedTarget}|${fromLang}|${seg.target}}}`);
+            }
+          } else if (missingLinkStrategy === 'keep_source') {
+            if (seg.display || translatedDisplay !== seg.target) {
+              parts.push(`[[${seg.target}|${translatedDisplay}]]`);
+            } else {
+              const parenMatch = seg.target.match(/^(.+?)\s*\([^)]+\)$/);
+              if (parenMatch && parenMatch[1].trim()) {
+                parts.push(`[[${seg.target}|${parenMatch[1].trim()}]]`);
+              } else {
+                parts.push(`[[${seg.target}]]`);
+              }
+            }
+          } else {
+            // Default: 'translate' (Native Red Link) or unmodified original if no translation provided
+            if (seg.display) {
+              parts.push(`[[${translatedTarget}|${translatedDisplay}]]`);
+            } else if (hasUnresolvedTranslation && translatedTarget !== translatedDisplay) {
+              parts.push(`[[${translatedTarget}|${translatedDisplay}]]`);
+            } else {
+              const parenMatch = translatedTarget.match(/^(.+?)\s*\([^)]+\)$/);
+              if (parenMatch && parenMatch[1].trim()) {
+                parts.push(`[[${translatedTarget}|${parenMatch[1].trim()}]]`);
+              } else {
+                parts.push(`[[${translatedTarget}]]`);
+              }
             }
           }
         }
@@ -527,12 +677,19 @@ export function reassembleWikitext(
       case 'template': {
         try {
           const parsed = parseTemplate(seg.content);
-          const translatedName = translatedTemplates[parsed.name] || parsed.name;
+          let translatedName = translatedTemplates[parsed.name] || parsed.name;
+          if (translatedName === parsed.name && toLang) {
+            const lower = parsed.name.toLowerCase();
+            if (['reflist', 'references', 'reference', 'ref', 'notes', 'refliste', 'ଆଧାର', 'ਹਵਾਲੇ', 'सन्दर्भ'].includes(lower)) {
+              translatedName = REFLIST_TEMPLATE_MAP[toLang] || translatedName;
+            }
+          }
           const reassembled = reassembleTemplate(
             parsed,
             translatedName,
             translatedParamTexts,
-            {}
+            {},
+            toLang
           );
           parts.push(reassembled);
         } catch {
@@ -562,17 +719,37 @@ export function reassembleWikitext(
         break;
       }
 
-      // Category: translate target via Wikidata if resolved
+      // Category: translate target via Wikidata if resolved, localize namespace prefix
       case 'category': {
-        const newTarget = translatedCategories[seg.target] ?? seg.target;
-        if (newTarget) {
-          if (seg.display) {
-            parts.push(`[[${newTarget}|${seg.display}]]`);
+        const translatedCat = translatedCategories[seg.target] ?? seg.target;
+
+        if (translatedCat && translatedCat !== seg.target) {
+          if (toLang && CATEGORY_PREFIX_MAP[toLang]) {
+            const targetPrefix = CATEGORY_PREFIX_MAP[toLang];
+            const colonIdx = translatedCat.indexOf(':');
+            const cleanTarget = colonIdx !== -1 ? translatedCat.slice(colonIdx + 1) : translatedCat;
+            if (seg.display) {
+              parts.push(`[[${targetPrefix}:${cleanTarget}|${seg.display}]]`);
+            } else {
+              parts.push(`[[${targetPrefix}:${cleanTarget}]]`);
+            }
           } else {
-            parts.push(`[[${newTarget}]]`);
+            if (seg.display) {
+              parts.push(`[[${translatedCat}|${seg.display}]]`);
+            } else {
+              parts.push(`[[${translatedCat}]]`);
+            }
           }
         } else {
-          parts.push(seg.content);
+          const targetPrefix = (toLang && CATEGORY_PREFIX_MAP[toLang]) || 'Category';
+          const colonIdx = seg.target.indexOf(':');
+          const cleanTarget = colonIdx !== -1 ? seg.target.slice(colonIdx + 1) : seg.target;
+          const translatedTargetName = (unresolvedTranslatedTargets && unresolvedTranslatedTargets[cleanTarget]) || cleanTarget;
+          if (seg.display) {
+            parts.push(`[[${targetPrefix}:${translatedTargetName}|${seg.display}]]`);
+          } else {
+            parts.push(`[[${targetPrefix}:${translatedTargetName}]]`);
+          }
         }
         break;
       }
@@ -684,9 +861,11 @@ export function reassembleTemplate(
   parsedTemplate,
   translatedName,
   translatedParamValues = {},
-  translatedParamNames = {}
+  translatedParamNames = {},
+  toLang = ''
 ) {
   const name = translatedName || parsedTemplate.name;
+  const langAliases = (toLang && TEMPLATE_PARAM_ALIASES[toLang]) || {};
 
   if (!parsedTemplate.params || parsedTemplate.params.length === 0) {
     if (parsedTemplate.headerComments) {
@@ -705,7 +884,8 @@ export function reassembleTemplate(
         lines.push(p.value);
         continue;
       }
-      const pName = translatedParamNames[p.name] || p.name;
+      const rawKey = p.name ? p.name.trim().toLowerCase() : '';
+      const pName = translatedParamNames[p.name] || langAliases[rawKey] || p.name;
       const pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
       if (p.isNamed) {
         lines.push(`| ${pName} = ${pVal}`);
@@ -719,7 +899,8 @@ export function reassembleTemplate(
     const headerPrefix = parsedTemplate.headerComments ? ` ${parsedTemplate.headerComments}` : '';
     const paramParts = parsedTemplate.params.map(p => {
       if (p.isComment) return p.value;
-      const pName = translatedParamNames[p.name] || p.name;
+      const rawKey = p.name ? p.name.trim().toLowerCase() : '';
+      const pName = translatedParamNames[p.name] || langAliases[rawKey] || p.name;
       const pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
       return p.isNamed ? `${pName} = ${pVal}` : pVal;
     });

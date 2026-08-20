@@ -203,68 +203,100 @@
           </div>
         </div>
 
-        <!-- Language Selector for Template -->
-        <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
-          <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-          </select>
-          <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
-          <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-            <option value="" disabled>Target</option>
-            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-          </select>
+        <!-- Upper Right Actions: Language Selector + Prominent Translate Button -->
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-end">
+          <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
+            <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+            </select>
+            <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
+            <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+              <option value="" disabled>Target</option>
+              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+            </select>
+          </div>
+
+          <!-- Upper Action Button -->
+          <button
+            @click="translateTemplateMode"
+            :disabled="templateTranslating || !templateInput.trim()"
+            class="btn-success text-xs py-2 px-4 flex items-center gap-1.5 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
+          >
+            <span class="material-icons-round text-sm" :class="{ 'animate-spin': templateTranslating }">{{ templateTranslating ? 'refresh' : 'translate' }}</span>
+            <span>{{ templateTranslating ? 'Translating...' : 'Translate Template' }}</span>
+          </button>
         </div>
       </div>
 
       <!-- Quick Samples -->
-      <div class="flex items-center gap-2 mb-3 flex-wrap text-xs">
+      <div class="flex items-center gap-2 mb-4 flex-wrap text-xs">
         <span class="text-slate-500 dark:text-zinc-400 font-medium">Quick Samples:</span>
-        <button @click="loadSampleTemplate('infobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
+        <button @click="loadSampleTemplate('infobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer font-medium">
           Infobox Person
         </button>
-        <button @click="loadSampleTemplate('cite')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
+        <button @click="loadSampleTemplate('cite')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer font-medium">
           Cite Web
         </button>
-        <button @click="loadSampleTemplate('taxobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
+        <button @click="loadSampleTemplate('taxobox')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer font-medium">
           Taxobox
         </button>
       </div>
 
-      <textarea
-        v-model="templateInput"
-        :dir="isSourceRtl ? 'rtl' : 'ltr'"
-        class="textarea-field w-full mb-3 font-mono text-xs"
-        rows="6"
-        placeholder="Paste template here, e.g. {{Infobox person | name = Albert Einstein | birth_place = Ulm, Germany | fields = Physics}}"
-      ></textarea>
+      <!-- Side-by-Side Template Layout -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Source Column -->
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Original Template</span>
+            <button
+              v-if="templateInput"
+              @click="templateInput = ''; templateTranslated = ''; templateStats = null;"
+              class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          <textarea
+            v-model="templateInput"
+            :dir="isSourceRtl ? 'rtl' : 'ltr'"
+            class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[240px] bg-slate-50/70 dark:bg-zinc-950/60 resize-y"
+            placeholder="Paste template here, e.g. {{Infobox settlement | name = Kendrapara | population_total = 41404}}"
+          ></textarea>
+        </div>
 
-      <div class="flex flex-wrap gap-2 items-center">
-        <button @click="translateTemplateMode" :disabled="templateTranslating || !templateInput.trim()" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 disabled:opacity-50">
-          <span class="material-icons-round text-sm" :class="{ 'animate-spin': templateTranslating }">{{ templateTranslating ? 'refresh' : 'translate' }}</span>
-          {{ templateTranslating ? 'Translating Template...' : 'Translate Template' }}
-        </button>
-        <button v-if="templateTranslated" @click="copyTemplateResult" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
-          <span class="material-icons-round text-sm">content_copy</span>
-          {{ $t('toolbar.copyAll') }}
-        </button>
+        <!-- Translation Column -->
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Translated Template</span>
+            <div v-if="templateTranslated" class="flex items-center gap-1.5">
+              <button @click="copyTemplateResult" class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1">
+                <span class="material-icons-round text-xs">content_copy</span> Copy
+              </button>
+            </div>
+          </div>
+          <textarea
+            v-model="templateTranslated"
+            :dir="isTargetRtl ? 'rtl' : 'ltr'"
+            class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[240px] bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/30 resize-y shadow-inner"
+            placeholder="Translated template will appear here..."
+          ></textarea>
+        </div>
       </div>
 
-      <!-- Template result & stats -->
-      <div v-if="templateTranslated" class="mt-4">
-        <div v-if="templateStats" class="flex flex-wrap gap-2 mb-2 text-xs">
-          <span class="px-2.5 py-1 rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400 font-medium">
-            Template: {{ templateStats.templateName }} → {{ templateStats.translatedName }}
+      <!-- Action & Stats Bar -->
+      <div v-if="templateStats" class="mt-4 pt-3 border-t border-slate-200/60 dark:border-white/[0.08] flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap gap-2 text-xs">
+          <span class="px-2.5 py-1 rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400 font-semibold">
+            {{ templateStats.templateName }} → {{ templateStats.translatedName }}
           </span>
-          <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-            Parameters: {{ templateStats.paramsTranslated }}/{{ templateStats.paramsCount }} translated
+          <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
+            {{ templateStats.paramsTranslated }}/{{ templateStats.paramsCount }} params translated ({{ templateStats.timingMs.total || 0 }}ms)
           </span>
         </div>
-        <label class="field-label">Translated Template</label>
-        <textarea v-model="templateTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
       </div>
     </div>
 
-    <!-- Raw Wikitext Mode -->
+    <!-- Raw Wikitext Mode (Side-by-Side) -->
     <div v-else-if="currentMode === 'wikitext'" key="mode-wikitext" class="card-elevated p-4 sm:p-6 mb-5 border-t-4 border-emerald-500">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div class="flex items-center gap-2">
@@ -273,51 +305,142 @@
           </div>
           <div>
             <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">{{ $t('toolbar.pasteWikitext') }}</h3>
-            <p class="text-xs text-slate-500 dark:text-zinc-400">Directly translate raw wikitext content</p>
+            <p class="text-xs text-slate-500 dark:text-zinc-400">Directly translate raw wikitext content in side-by-side view</p>
           </div>
         </div>
 
-        <!-- Language Selector for Wikitext -->
-        <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
-          <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-          </select>
-          <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
-          <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
-            <option value="" disabled>Target</option>
-            <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-          </select>
+        <!-- Upper Right Actions: Language Selector + Prominent Translate Button -->
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-end">
+          <div class="flex items-center gap-1.5 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08]">
+            <select v-model="fromLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+            </select>
+            <span class="material-icons-round text-xs text-slate-400">arrow_forward</span>
+            <select v-model="toLanguage" class="select-field bg-transparent border-0 py-1 pl-2 pr-6 text-xs font-semibold focus:ring-0 text-slate-800 dark:text-zinc-200 w-28">
+              <option value="" disabled>Target</option>
+              <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+            </select>
+          </div>
+
+          <!-- Upper Action Button -->
+          <button
+            @click="translateWikitextMode"
+            :disabled="wikitextTranslating || !wikitextInput.trim()"
+            class="btn-success text-xs py-2 px-4 flex items-center gap-1.5 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
+          >
+            <span class="material-icons-round text-sm" :class="{ 'animate-spin': wikitextTranslating }">{{ wikitextTranslating ? 'refresh' : 'translate' }}</span>
+            <span>{{ wikitextTranslating ? 'Translating...' : 'Translate Wikitext' }}</span>
+          </button>
         </div>
       </div>
 
-      <textarea
-        v-model="wikitextInput"
-        :dir="isSourceRtl ? 'rtl' : 'ltr'"
-        class="textarea-field w-full mb-3 font-mono text-xs"
-        rows="6"
-        placeholder="Paste raw wikitext here..."
-      ></textarea>
+      <!-- Side-by-Side Wikitext Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Source Column -->
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Source Wikitext</span>
+            <button
+              v-if="wikitextInput"
+              @click="wikitextInput = ''; wikitextTranslated = '';"
+              class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          <textarea
+            v-model="wikitextInput"
+            :dir="isSourceRtl ? 'rtl' : 'ltr'"
+            class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[260px] bg-slate-50/70 dark:bg-zinc-950/60 resize-y"
+            placeholder="Paste raw wikitext with headings, links, templates, and categories here..."
+          ></textarea>
+        </div>
 
-      <div class="flex flex-wrap gap-2 items-center">
-        <button @click="translateWikitextMode" :disabled="wikitextTranslating || !wikitextInput.trim()" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 disabled:opacity-50">
-          <span class="material-icons-round text-sm" :class="{ 'animate-spin': wikitextTranslating }">{{ wikitextTranslating ? 'refresh' : 'translate' }}</span>
-          {{ wikitextTranslating ? $t('paragraph.translating') : $t('toolbar.translate') }}
-        </button>
-        <button v-if="wikitextTranslated" @click="copyWikitextResult" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
-          <span class="material-icons-round text-sm">content_copy</span>
-          {{ $t('toolbar.copyAll') }}
-        </button>
-      </div>
-
-      <!-- Wikitext result -->
-      <div v-if="wikitextTranslated" class="mt-4">
-        <label class="field-label">{{ $t('toolbar.translationResult') }}</label>
-        <textarea v-model="wikitextTranslated" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="textarea-field font-mono text-xs" rows="6"></textarea>
+        <!-- Translation Column -->
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Translated Wikitext</span>
+            <div v-if="wikitextTranslated" class="flex items-center gap-2">
+              <button @click="copyWikitextResult" class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1">
+                <span class="material-icons-round text-xs">content_copy</span> Copy
+              </button>
+            </div>
+          </div>
+          <textarea
+            v-model="wikitextTranslated"
+            :dir="isTargetRtl ? 'rtl' : 'ltr'"
+            class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[260px] bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/30 resize-y shadow-inner"
+            placeholder="Translated wikitext will appear here..."
+          ></textarea>
+        </div>
       </div>
     </div>
 
     <!-- Article Sections & Mode Content -->
     <div v-else-if="currentMode === 'article'" key="mode-article">
+      <!-- Interactive Animated Sticky Progress Card when Batch Translating -->
+      <transition name="fade">
+        <div v-if="isTranslatingAll" class="sticky top-14 z-30 mb-4 p-4 rounded-2xl border border-primary-200/90 dark:border-primary-800/80 bg-white/95 dark:bg-zinc-900/95 shadow-xl backdrop-blur-xl transition-all duration-300">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-2.5">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="relative flex h-3 w-3 shrink-0">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-primary-500"></span>
+              </span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2 truncate">
+                  <span>Translating Section {{ translatingCurrentIndex }} of {{ translatingTotalCount }}</span>
+                  <span class="text-[11px] font-semibold text-primary-600 dark:text-primary-400">({{ batchProgressPercent }}%)</span>
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-zinc-400 truncate mt-0.5 font-mono">
+                  {{ translatingStageText || 'Translating wikitext & resolving links...' }}
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-2 shrink-0">
+              <!-- Auto-scroll Toggle Switch -->
+              <button
+                type="button"
+                @click="toggleAutoScroll"
+                class="text-[11px] font-medium px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 cursor-pointer"
+                :class="[
+                  autoScrollEnabled
+                    ? 'bg-primary-50 dark:bg-primary-950/60 border-primary-300 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                    : 'bg-slate-100 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400'
+                ]"
+                :title="autoScrollEnabled ? 'Auto-scroll is ON' : 'Auto-scroll is OFF'"
+              >
+                <span class="material-icons-round text-xs">{{ autoScrollEnabled ? 'gps_fixed' : 'gps_off' }}</span>
+                <span>Auto-scroll: {{ autoScrollEnabled ? 'ON' : 'OFF' }}</span>
+              </button>
+
+              <span class="text-[11px] font-mono text-slate-500 dark:text-zinc-400 bg-white/80 dark:bg-zinc-800/80 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-zinc-700/60 shadow-2xs">
+                ⏱️ {{ translatingElapsedSeconds }}s
+              </span>
+              <button
+                type="button"
+                @click="cancelTranslateAll"
+                class="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800/60 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span class="material-icons-round text-xs">close</span>
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <!-- Animated Gradient Shimmer Progress Bar -->
+          <div class="w-full h-2 bg-slate-200/80 dark:bg-zinc-800/80 rounded-full overflow-hidden relative shadow-inner">
+            <div
+              class="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-300 relative overflow-hidden"
+              :style="{ width: batchProgressPercent + '%' }"
+            >
+              <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer-fast"></div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
       <!-- Stats bar shown when paragraphs are loaded -->
       <div v-if="paragraphs.length" class="flex flex-wrap items-center gap-3 mb-4 text-xs text-slate-500 dark:text-zinc-400">
         <span class="flex items-center gap-1">
@@ -332,13 +455,28 @@
           <span class="w-2 h-2 rounded-full bg-slate-300 dark:bg-zinc-700"></span>
           {{ paragraphs.length - translatedCount }} {{ $t('paragraph.pending') }}
         </span>
-        <div class="flex-1 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+        <div class="flex-1 h-2 bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden relative min-w-[80px]">
           <div
-            class="h-full bg-gradient-to-r from-primary-500 to-emerald-500 rounded-full transition-all duration-500"
+            class="h-full bg-gradient-to-r from-primary-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-500 relative overflow-hidden"
             :style="{ width: translationProgress + '%' }"
-          ></div>
+          >
+            <div v-if="isTranslatingAll" class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer-fast"></div>
+          </div>
         </div>
         <span class="font-semibold text-primary-600 dark:text-primary-400">{{ translationProgress }}%</span>
+
+        <!-- Source Article Link -->
+        <a
+          v-if="articleInput"
+          :href="`https://${fromLanguage}.wikipedia.org/wiki/${encodeURIComponent(articleInput)}`"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-medium transition-colors ml-auto text-[11px]"
+          title="Open source article on Wikipedia in new tab"
+        >
+          <span class="material-icons-round text-xs text-primary-500">open_in_new</span>
+          <span>{{ fromLanguage }}:{{ articleInput }}</span>
+        </a>
       </div>
 
       <!-- Sections List -->
@@ -353,6 +491,7 @@
             :status="para.status"
             :isSourceRtl="isSourceRtl"
             :isTargetRtl="isTargetRtl"
+            :targetLang="toLanguage"
             @translate-paragraph="translateParagraph"
             @update-translation="updateTranslation"
           />
@@ -507,6 +646,21 @@
                 <label class="field-label">Model Name</label>
                 <input v-model="serviceModel" type="text" class="input-field font-mono text-xs" :placeholder="modelPlaceholder" />
               </div>
+
+              <!-- Missing Wikilink Strategy -->
+              <div class="pt-3 border-t border-slate-200/80 dark:border-white/[0.08]">
+                <label class="field-label flex items-center gap-1.5">
+                  <span class="material-icons-round text-sm text-primary-500">link</span>
+                  Missing Wikilink Handling
+                </label>
+                <p class="text-[11px] text-slate-400 dark:text-zinc-500 mb-2">When a linked article doesn't exist on target Wikipedia:</p>
+                <select v-model="missingLinkStrategy" class="select-field">
+                  <option value="translate">🔴 Native Red Link (Translate Title - Recommended)</option>
+                  <option value="ill">🌐 Interlanguage Link Template ({{ill}} / {{Lien}})</option>
+                  <option value="plain">📝 Plain Text (Strip [[ ]] Brackets)</option>
+                  <option value="keep_source">🔤 Keep Original Source Link Title</option>
+                </select>
+              </div>
             </div>
 
             <div class="mt-6 flex justify-end">
@@ -586,18 +740,29 @@ export default {
       templateTranslating: false,
       templateStats: null,
 
-      // Translation service
+      // Translation service & options
       translationService: 'mint',
       serviceInput: '',
       serviceEndpoint: '',
       serviceModel: '',
+      missingLinkStrategy: 'translate', // 'translate' | 'ill' | 'plain' | 'keep_source'
 
       // UI state
       showResetConfirm: false,
 
-      // Progress
+      // Progress & Batch Translation State
       showProgressBar: false,
       progressBarWidth: 0,
+      isTranslatingAll: false,
+      autoScrollEnabled: localStorage.getItem('source_translation_autoscroll') !== 'false',
+      translatingCurrentIndex: 0,
+      translatingTotalCount: 0,
+      translatingDoneCount: 0,
+      translatingStageText: '',
+      translatingStartTime: null,
+      translatingElapsedSeconds: 0,
+      translatingTimer: null,
+      translatingCancelRequested: false,
 
       // Preview
       showPreview: false,
@@ -770,6 +935,10 @@ export default {
       if (!this.paragraphs.length) return 0;
       return Math.round((this.translatedCount / this.paragraphs.length) * 100);
     },
+    batchProgressPercent() {
+      if (!this.translatingTotalCount) return 0;
+      return Math.round((this.translatingDoneCount / this.translatingTotalCount) * 100);
+    },
     toastClass() {
       const base = 'fixed top-4 right-4 z-50 px-4 py-3 rounded-2xl shadow-xl text-xs font-medium cursor-pointer max-w-sm flex items-center gap-2';
       if (this.toastType === 'success') return `${base} bg-emerald-600 text-white`;
@@ -846,11 +1015,65 @@ export default {
         return;
       }
 
+      this.isTranslatingAll = true;
+      this.translatingCancelRequested = false;
+      this.translatingTotalCount = pendingIndices.length;
+      this.translatingDoneCount = 0;
+      this.translatingElapsedSeconds = 0;
+      this.translatingStartTime = Date.now();
+
+      if (this.translatingTimer) clearInterval(this.translatingTimer);
+      this.translatingTimer = setInterval(() => {
+        if (this.translatingStartTime) {
+          this.translatingElapsedSeconds = Math.floor((Date.now() - this.translatingStartTime) / 1000);
+        }
+      }, 1000);
+
       this.showToast(`Translating ${pendingIndices.length} section(s)...`, 'warning');
-      for (const idx of pendingIndices) {
+
+      for (let i = 0; i < pendingIndices.length; i++) {
+        if (this.translatingCancelRequested) {
+          this.showToast('Batch translation paused.', 'warning');
+          break;
+        }
+        const idx = pendingIndices[i];
+        this.translatingCurrentIndex = i + 1;
+        const sourceText = (this.paragraphs[idx].source || '').trim();
+        const snippet = sourceText.replace(/^[=\s]+|[=\s]+$/g, '').slice(0, 45);
+        this.translatingStageText = snippet ? `Translating: "${snippet}..."` : 'Translating section...';
+
+        // Smoothly scroll active section into view if auto-scroll is enabled
+        if (this.autoScrollEnabled) {
+          this.$nextTick(() => {
+            const el = document.getElementById(`paragraph-section-${idx}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          });
+        }
+
         await this.translateParagraph(idx);
+        this.translatingDoneCount = i + 1;
       }
-      this.showToast('All pending sections translated!', 'success');
+
+      if (this.translatingTimer) clearInterval(this.translatingTimer);
+      this.isTranslatingAll = false;
+      if (!this.translatingCancelRequested) {
+        this.showToast('All pending sections translated!', 'success');
+      }
+    },
+
+    toggleAutoScroll() {
+      this.autoScrollEnabled = !this.autoScrollEnabled;
+      localStorage.setItem('source_translation_autoscroll', String(this.autoScrollEnabled));
+      this.showToast(`Auto-scroll ${this.autoScrollEnabled ? 'enabled' : 'disabled'}`, 'info');
+    },
+
+    cancelTranslateAll() {
+      this.translatingCancelRequested = true;
+      if (this.translatingTimer) clearInterval(this.translatingTimer);
+      this.isTranslatingAll = false;
+      this.showToast('Translation cancelled.', 'warning');
     },
 
     saveState() {
@@ -863,6 +1086,7 @@ export default {
         serviceInput: this.serviceInput,
         serviceEndpoint: this.serviceEndpoint,
         serviceModel: this.serviceModel,
+        missingLinkStrategy: this.missingLinkStrategy,
         paragraphs: this.paragraphs,
         rawWikitext: this.rawWikitext,
         showWikitextBox: this.showWikitextBox,
@@ -889,6 +1113,7 @@ export default {
           if (parsed.serviceInput) this.serviceInput = parsed.serviceInput;
           if (parsed.serviceEndpoint) this.serviceEndpoint = parsed.serviceEndpoint;
           if (parsed.serviceModel) this.serviceModel = parsed.serviceModel;
+          if (parsed.missingLinkStrategy) this.missingLinkStrategy = parsed.missingLinkStrategy;
           if (parsed.paragraphs) this.paragraphs = parsed.paragraphs;
           if (parsed.rawWikitext) this.rawWikitext = parsed.rawWikitext;
           if (parsed.showWikitextBox) this.showWikitextBox = parsed.showWikitextBox;
@@ -1104,6 +1329,7 @@ export default {
           apiKey: this.serviceInput || undefined,
           apiEndpoint: this.serviceEndpoint || undefined,
           model: this.serviceModel || undefined,
+          missingLinkStrategy: this.missingLinkStrategy,
         });
         
         // Backend returns { translatedText, stats }
@@ -1163,6 +1389,7 @@ export default {
           apiKey: this.serviceInput || undefined,
           apiEndpoint: this.serviceEndpoint || undefined,
           model: this.serviceModel || undefined,
+          missingLinkStrategy: this.missingLinkStrategy,
         });
         this.wikitextTranslated = response.data?.translatedText || response.data?.translation || response.data?.text || '';
       } catch (err) {

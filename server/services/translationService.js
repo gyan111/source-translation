@@ -118,6 +118,9 @@ async function callWithRetry(adapter, text, fromLang, toLang, options) {
 
 // ──────────────────────────── Adapters ────────────────────────────
 
+let wmcloudDownUntil = 0;
+let cxserverDownUntil = 0;
+
 /**
  * Wikimedia MinT - free MT service designed for Wikipedia content.
  * Primary:  https://translate.wmcloud.org/api/translate
@@ -126,54 +129,62 @@ async function callWithRetry(adapter, text, fromLang, toLang, options) {
  * Fallback 3: Apertium via cxserver
  */
 async function mintTranslate(text, fromLang, toLang, _options) {
-  // 1. Primary: MinT direct API (5s timeout)
-  try {
-    const response = await axios.post('https://translate.wmcloud.org/api/translate', {
-      content: text,
-      source_language: fromLang,
-      target_language: toLang,
-      format: 'text',
-    }, {
-      timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
-      },
-    });
+  const now = Date.now();
 
-    if (response.data && response.data.translation) {
-      return response.data.translation;
+  // 1. Primary: MinT direct API (2.5s timeout with 60s circuit breaker)
+  if (now > wmcloudDownUntil) {
+    try {
+      const response = await axios.post('https://translate.wmcloud.org/api/translate', {
+        content: text,
+        source_language: fromLang,
+        target_language: toLang,
+        format: 'text',
+      }, {
+        timeout: 2500,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
+        },
+      });
+
+      if (response.data && response.data.translation) {
+        return response.data.translation;
+      }
+    } catch (err) {
+      wmcloudDownUntil = Date.now() + 60000;
+      console.warn(`MinT primary endpoint down (${err.code || err.message}). Circuit-breaking for 60s...`);
     }
-  } catch (err) {
-    console.warn(`MinT primary endpoint unavailable (${err.code || err.message}). Trying fallbacks...`);
   }
 
-  // 2. Fallback: Wikimedia Content Translation API (cxserver) (6s timeout)
-  try {
-    const url = `https://cxserver.wikimedia.org/v2/translate/${fromLang}/${toLang}/MinT`;
-    const response = await axios.post(url, text, {
-      timeout: 6000,
-      headers: {
-        'Content-Type': 'text/plain',
-        'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
-      },
-    });
+  // 2. Fallback: Wikimedia Content Translation API (cxserver) (2.5s timeout with 60s circuit breaker)
+  if (now > cxserverDownUntil) {
+    try {
+      const url = `https://cxserver.wikimedia.org/v2/translate/${fromLang}/${toLang}/MinT`;
+      const response = await axios.post(url, text, {
+        timeout: 2500,
+        headers: {
+          'Content-Type': 'text/plain',
+          'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
+        },
+      });
 
-    if (response.data && typeof response.data === 'string' && response.data.trim()) {
-      return response.data;
+      if (response.data && typeof response.data === 'string' && response.data.trim()) {
+        return response.data;
+      }
+      if (response.data && response.data.contents) {
+        return response.data.contents;
+      }
+    } catch (err2) {
+      cxserverDownUntil = Date.now() + 60000;
+      console.warn(`MinT cxserver fallback down: ${err2.message}. Circuit-breaking for 60s...`);
     }
-    if (response.data && response.data.contents) {
-      return response.data.contents;
-    }
-  } catch (err2) {
-    console.warn(`MinT cxserver fallback unavailable: ${err2.message}`);
   }
 
-  // 3. Fallback: Google Free GTX translation (near-instant fallback)
+  // 3. Fallback: Google Free GTX translation (near-instant ~300ms)
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${fromLang}&tl=${toLang}&dt=t&q=${encodeURIComponent(text)}`;
     const response = await axios.get(url, {
-      timeout: 6000,
+      timeout: 5000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; SourceTranslationTool/2.0)',
       },

@@ -10,3 +10,12 @@
   display: flex;
   flex-direction: column;
 }
+
+@keyframes shimmerMove {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer-fast {
+  animation: shimmerMove 1.8s infinite ease-in-out;
+}

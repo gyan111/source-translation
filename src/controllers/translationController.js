@@ -30,7 +30,7 @@ export const rateLimiter = (req, res, next) => {
 };
 
 export const translate = async (req, res) => {
-  const { text, fromLanguage, toLanguage, translationService, apiKey, apiEndpoint, model } = req.body;
+  const { text, fromLanguage, toLanguage, translationService, apiKey, apiEndpoint, model, missingLinkStrategy } = req.body;
 
   if (!text || !fromLanguage || !toLanguage) {
     return res.status(400).json({
@@ -57,14 +57,14 @@ export const translate = async (req, res) => {
   }
 
   try {
-    console.log(`[Translation] ${fromLanguage} → ${toLanguage} via ${service} (${text.length} chars)`);
+    console.log(`[Translation] ${fromLanguage} → ${toLanguage} via ${service} (${text.length} chars, missingLinkStrategy: ${missingLinkStrategy || 'translate'})`);
 
     const { translatedText, stats } = await translateWikitext(
       text,
       fromLanguage,
       toLanguage,
       service,
-      { apiKey, apiEndpoint, model }
+      { apiKey, apiEndpoint, model, missingLinkStrategy }
     );
 
     console.log(`[Translation] Done in ${stats.timingMs?.total || '?'}ms. Links: ${stats.linksTranslated}/${stats.linksFound}, Templates: ${stats.templatesTranslated}/${stats.templatesFound}, Params: ${stats.templateParamsTranslated || 0}, Errors: ${stats.errors.length}`);

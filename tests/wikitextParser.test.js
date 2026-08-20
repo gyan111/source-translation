@@ -228,6 +228,135 @@ describe('wikitextParser', () => {
       expect(normalized).toContain('* Item 2');
       expect(normalized).toContain('[[Target|Display]]');
     });
+
+    it('fixes missing spacing between prose words and wikilinks across languages', () => {
+      const frenchText = 'Il est connu comme le[[Père de la Nation]]en Inde.';
+      const punjabiText = 'ਇਹ ਪਿੰਡ[[ਕਟକ]]ਸ਼ਹਿਰ ਦੇ ਨੇੜੇ ਹੈ।';
+      
+      const normFr = normalizeWikitextSyntax(frenchText);
+      const normPa = normalizeWikitextSyntax(punjabiText);
+
+      expect(normFr).toBe('Il est connu comme le [[Père de la Nation]] en Inde.');
+      expect(normPa).toBe('ਇਹ ਪਿੰਡ [[ਕਟକ]] ਸ਼ਹਿਰ ਦੇ ਨੇੜੇ ਹੈ।');
+    });
+
+    it('protects image filenames and media parameters from translation', () => {
+      const wikitext = `{{Infobox person
+| name = Mahatma Gandhi
+| image = Mahatma-Gandhi, studio, 1931.jpg
+| signature = Gandhi signature.svg
+| birth_place = [[Porbandar]], [[Kathiawar Agency]]
+}}`;
+      const segments = parseWikitext(wikitext);
+      const paramTexts = extractTemplateParamTexts(segments);
+
+      const translatableParams = paramTexts.map(p => p.paramName);
+      expect(translatableParams).toContain('name');
+      expect(translatableParams).toContain('birth_place');
+      expect(translatableParams).not.toContain('image');
+      expect(translatableParams).not.toContain('signature');
+    });
+
+    it('handles missing link strategies: translate (red link), ill, and plain text', () => {
+      const text = 'Born in [[Porbandar State]].';
+      const segments = parseWikitext(text);
+      const translatedTexts = { 'Born in ': 'Né dans ' };
+      const translatedDisplayTexts = { 'Porbandar State': 'État de Porbandar' };
+      const unresolvedTranslatedTargets = { 'Porbandar State': 'État de Porbandar' };
+
+      // Strategy 1: 'translate' (Native Red Link)
+      const redlinkRes = reassembleWikitext(
+        segments,
+        translatedTexts,
+        {}, // No Wikidata sitelink
+        {},
+        translatedDisplayTexts,
+        {},
+        {},
+        { missingLinkStrategy: 'translate', fromLang: 'en', toLang: 'fr', unresolvedTranslatedTargets }
+      );
+      expect(redlinkRes).toBe('Né dans [[État de Porbandar]].');
+
+      // Strategy 2: 'ill' (Interlanguage template)
+      const illRes = reassembleWikitext(
+        segments,
+        translatedTexts,
+        {},
+        {},
+        translatedDisplayTexts,
+        {},
+        {},
+        { missingLinkStrategy: 'ill', fromLang: 'en', toLang: 'fr', unresolvedTranslatedTargets }
+      );
+      expect(illRes).toBe('Né dans {{Lien|trad=Porbandar State|titre=État de Porbandar|lang=en}}.');
+
+      // Strategy 3: 'plain' (Plain unlinked text)
+      const plainRes = reassembleWikitext(
+        segments,
+        translatedTexts,
+        {},
+        {},
+        translatedDisplayTexts,
+        {},
+        {},
+        { missingLinkStrategy: 'plain', fromLang: 'en', toLang: 'fr', unresolvedTranslatedTargets }
+      );
+      expect(plainRes).toBe('Né dans État de Porbandar.');
+    });
+
+    it('localizes category namespace prefix across target languages', () => {
+      const text = '[[Category:Indian activists]]';
+      const segments = parseWikitext(text);
+      const unresolvedTranslatedTargets = { 'Indian activists': 'Militants indiens' };
+
+      const frRes = reassembleWikitext(
+        segments,
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { toLang: 'fr', unresolvedTranslatedTargets }
+      );
+      expect(frRes).toBe('[[Catégorie:Militants indiens]]');
+    });
+
+    it('normalizes MT coordinate errors, interwiki links, and political terms', () => {
+      const brokenCoord = 'Kendrapara est situé à {{Coord|20h50|N|86.42|E}}.';
+      const brokenInterwiki = '[[:ou:ଗର୍ତ୍ତେଶ୍ବର ମହାଦେବ|Temple Garteswar]]';
+      const brokenParty = 'Membres de la Fête Janata et Fête Bharatiya Janata.';
+
+      expect(normalizeWikitextSyntax(brokenCoord)).toContain('{{Coord|20.50|N|86.42|E}}');
+      expect(normalizeWikitextSyntax(brokenInterwiki)).toBe('[[:or:ଗର୍ତ୍ତେଶ୍ବର ମହାଦେବ|Temple Garteswar]]');
+      expect(normalizeWikitextSyntax(brokenParty)).toContain('Parti Janata');
+      expect(normalizeWikitextSyntax(brokenParty)).toContain('Parti Bharatiya Janata');
+    });
+
+    it('maps English template parameter aliases to target language in reassembleTemplate', () => {
+      const tpl = `{{Infobox settlement
+| name = Kendrapara
+| settlement_type = City
+| subdivision_name = India
+| population_total = 41404
+| elevation_m = 13
+}}`;
+      const parsed = parseTemplate(tpl);
+      const reassembled = reassembleTemplate(
+        parsed,
+        'Infobox Localité',
+        { 'City': 'Ville', 'India': 'Inde' },
+        {},
+        'fr'
+      );
+
+      expect(reassembled).toContain('{{Infobox Localité');
+      expect(reassembled).toContain('| nom = Kendrapara');
+      expect(reassembled).toContain('| statut = Ville');
+      expect(reassembled).toContain('| pays = Inde');
+      expect(reassembled).toContain('| population = 41404');
+      expect(reassembled).toContain('| altitude = 13');
+    });
   });
 });
 

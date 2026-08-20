@@ -20,6 +20,7 @@ import {
   reassembleWikitext,
   parseTemplate,
   reassembleTemplate,
+  isTranslatableParamValue,
 } from './wikitextParser.js';
 import {
   translateTitlesViaWikidata,
@@ -138,7 +139,7 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
   }
   stats.timingMs.textTranslation = Date.now() - stepStart;
 
-  // Step 7: Translate display texts of wikilinks
+  // Step 7: Translate display texts of wikilinks (prioritizing exact Wikidata resolved titles)
   if (onProgress) onProgress('display_texts', 70);
   stepStart = Date.now();
   const displayTexts = segments
@@ -152,10 +153,25 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
   let translatedDisplayTexts = {};
   if (allDisplayTexts.length > 0) {
     try {
-      translatedDisplayTexts = await translateTexts(allDisplayTexts, fromLang, toLang, service, options);
+      const needsMtTranslation = [];
+      for (const text of allDisplayTexts) {
+        // If exact Wikidata resolved title is available, use it directly instead of letting MT guess
+        if (translatedLinks[text] && translatedLinks[text] !== text) {
+          translatedDisplayTexts[text] = translatedLinks[text];
+        } else {
+          needsMtTranslation.push(text);
+        }
+      }
+
+      if (needsMtTranslation.length > 0) {
+        const mtResults = await translateTexts(needsMtTranslation, fromLang, toLang, service, options);
+        Object.assign(translatedDisplayTexts, mtResults);
+      }
     } catch (err) {
       stats.errors.push(`Display text translation error: ${err.message}`);
-      for (const t of allDisplayTexts) translatedDisplayTexts[t] = t;
+      for (const t of allDisplayTexts) {
+        if (!translatedDisplayTexts[t]) translatedDisplayTexts[t] = t;
+      }
     }
   }
   stats.timingMs.displayTexts = Date.now() - stepStart;
@@ -202,7 +218,10 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
             subTranslatedTexts,
             translatedLinks,
             translatedTemplates,
-            translatedDisplayTexts
+            translatedDisplayTexts,
+            {},
+            {},
+            { missingLinkStrategy: options.missingLinkStrategy || 'translate', fromLang, toLang }
           );
         }
       }
@@ -217,8 +236,34 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
   }
   stats.timingMs.templateParams = Date.now() - stepStart;
 
+  // Step 8.5: Translate unresolved link targets and category names (for native red links / missing categories)
+  const unresolvedLinkTargets = linkTargets.filter(t => !translatedLinks[t] || translatedLinks[t] === t);
+  const cleanCategoryTargets = categoryTargets.map(c => c.replace(/^(?:Category|Catégorie|ਸ਼੍ਰେਣੀ|श्रेणी|विषयশ্রেণী|వర్గం|تصنيف|Категория):/i, '').trim());
+  const unresolvedCategoryTargets = cleanCategoryTargets.filter(c => {
+    const origWithPrefix = `Category:${c}`;
+    const mapped = translatedCategories[origWithPrefix] || translatedCategories[c];
+    return !mapped || mapped === origWithPrefix || mapped === c;
+  });
+  const unresolvedAll = [...new Set([...unresolvedLinkTargets, ...unresolvedCategoryTargets])];
+
+  let unresolvedTranslatedTargets = {};
+  if (unresolvedAll.length > 0) {
+    try {
+      unresolvedTranslatedTargets = await translateTexts(unresolvedAll, fromLang, toLang, service, options);
+    } catch (err) {
+      for (const u of unresolvedAll) unresolvedTranslatedTargets[u] = u;
+    }
+  }
+
   // Step 9: Reassemble
   if (onProgress) onProgress('reassemble', 95);
+  const reassembleOptions = {
+    missingLinkStrategy: options.missingLinkStrategy || 'translate',
+    fromLang,
+    toLang,
+    unresolvedTranslatedTargets,
+  };
+
   const translatedText = reassembleWikitext(
     segments,
     translatedTextsMap,
@@ -226,7 +271,8 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
     translatedTemplates,
     translatedDisplayTexts,
     translatedParamTexts,
-    translatedCategories
+    translatedCategories,
+    reassembleOptions
   );
 
   stats.timingMs.total = Date.now() - startTime;
@@ -249,7 +295,39 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
  */
 export async function translateTemplate(templateWikitext, fromLang, toLang, service, options = {}) {
   const startTime = Date.now();
-  const parsed = parseTemplate(templateWikitext);
+  const trimmed = (templateWikitext || '').trim();
+
+  if (fromLang === toLang || !trimmed) {
+    return {
+      translatedTemplate: templateWikitext,
+      parsed: { name: 'template', params: [] },
+      stats: { templateName: '', translatedName: '', paramsCount: 0, paramsTranslated: 0, timingMs: {}, errors: [] },
+    };
+  }
+
+  // Check if multiple templates or mixed wikitext was pasted (e.g. {{Use Indian English...}} {{Infobox settlement...}})
+  const segments = parseWikitext(trimmed);
+  const templateSegments = segments.filter(s => s.type === 'template');
+
+  if (templateSegments.length > 1 || segments.some(s => s.type !== 'template')) {
+    // Process via full pipeline so ALL templates (Infoboxes + maintenance tags) are properly mapped and localized!
+    const res = await translateArticle(trimmed, fromLang, toLang, service, options);
+    const firstTpl = templateSegments[0] ? parseTemplate(templateSegments[0].content) : { name: 'template' };
+    return {
+      translatedTemplate: res.translatedText,
+      parsed: firstTpl,
+      stats: {
+        templateName: templateSegments.map(t => parseTemplate(t.content).name).join(', '),
+        translatedName: 'translated',
+        paramsCount: templateSegments.length,
+        paramsTranslated: templateSegments.length,
+        timingMs: res.stats.timingMs,
+        errors: res.stats.errors,
+      },
+    };
+  }
+
+  const parsed = parseTemplate(trimmed);
 
   const stats = {
     templateName: parsed.name,
@@ -260,55 +338,87 @@ export async function translateTemplate(templateWikitext, fromLang, toLang, serv
     errors: [],
   };
 
-  if (fromLang === toLang) {
-    return { translatedTemplate: templateWikitext, parsed, stats };
-  }
-
-  // 1. Translate template name via Wikidata
-  let translatedName = parsed.name;
-  try {
-    const templateMap = await translateTemplateNames([parsed.name], fromLang, toLang);
-    translatedName = templateMap[parsed.name] || parsed.name;
-    stats.translatedName = translatedName;
-  } catch (err) {
-    stats.errors.push(`Template name translation error: ${err.message}`);
-  }
-
-  // 2. Identify translatable parameter values (skip pure numbers, dates, empty values)
-  const translatableValues = [];
+  // 1. Identify translatable parameter values (skip media filenames, comments, numbers, dates)
+  const translatableParams = [];
   for (const p of parsed.params) {
+    if (p.isComment) continue;
     const val = p.value.trim();
-    if (val && !/^\d+$/.test(val) && !/^\d{4}-\d{2}-\d{2}$/.test(val) && !/^https?:\/\//i.test(val)) {
-      translatableValues.push(val);
+    if (isTranslatableParamValue(val, p.name)) {
+      translatableParams.push({ param: p, text: val, hasWikilinks: val.includes('[[') || val.includes('{{') });
     }
   }
 
-  // 3. Translate parameter values
-  let translatedValuesMap = {};
-  if (translatableValues.length > 0) {
-    try {
-      // If a parameter contains inner wikilinks or formatting, translate with translateWikitext; else translateTexts
-      for (const val of translatableValues) {
-        if (val.includes('[[') || val.includes('{{')) {
-          const res = await translateWikitext(val, fromLang, toLang, service, options);
-          translatedValuesMap[val] = res.translatedText;
+  // 2. Collect all link targets, template names, and text strings to batch translate in parallel
+  const linkTargets = new Set();
+  const templateNames = new Set([parsed.name]);
+  const textsToTranslate = new Set();
+  const parsedParamMap = new Map();
+
+  for (const item of translatableParams) {
+    if (item.hasWikilinks) {
+      const subSegments = parseWikitext(item.text);
+      parsedParamMap.set(item.text, subSegments);
+      for (const seg of subSegments) {
+        if (seg.type === 'link') {
+          linkTargets.add(seg.target);
+          if (seg.display) textsToTranslate.add(seg.display);
+        } else if (seg.type === 'template') {
+          templateNames.add(seg.content.slice(2, -2).split('|')[0].trim());
+        } else if (seg.type === 'text' && seg.content.trim()) {
+          textsToTranslate.add(seg.content);
         }
       }
-
-      const plainTexts = translatableValues.filter(v => !translatedValuesMap[v]);
-      if (plainTexts.length > 0) {
-        const textRes = await translateTexts(plainTexts, fromLang, toLang, service, options);
-        translatedValuesMap = { ...translatedValuesMap, ...textRes };
-      }
-
-      stats.paramsTranslated = Object.keys(translatedValuesMap).length;
-    } catch (err) {
-      stats.errors.push(`Parameter values translation error: ${err.message}`);
+    } else {
+      textsToTranslate.add(item.text);
     }
   }
 
-  // 4. Reassemble template
-  const translatedTemplate = reassembleTemplate(parsed, translatedName, translatedValuesMap);
+  // 3. Execute batch lookups in parallel
+  let translatedName = parsed.name;
+  let translatedLinks = {};
+  let translatedTemplates = {};
+  let translatedTexts = {};
+
+  try {
+    const [linksRes, templatesRes, textsRes] = await Promise.all([
+      linkTargets.size > 0 ? translateLinkTitles([...linkTargets], fromLang, toLang) : Promise.resolve({}),
+      templateNames.size > 0 ? translateTemplateNames([...templateNames], fromLang, toLang) : Promise.resolve({}),
+      textsToTranslate.size > 0 ? translateTexts([...textsToTranslate], fromLang, toLang, service, options) : Promise.resolve({}),
+    ]);
+
+    translatedLinks = linksRes || {};
+    translatedTemplates = templatesRes || {};
+    translatedTexts = textsRes || {};
+    translatedName = translatedTemplates[parsed.name] || parsed.name;
+    stats.translatedName = translatedName;
+  } catch (err) {
+    stats.errors.push(`Batch translation error: ${err.message}`);
+  }
+
+  // 4. Reassemble parameter values
+  const translatedValuesMap = {};
+  for (const item of translatableParams) {
+    if (item.hasWikilinks && parsedParamMap.has(item.text)) {
+      const subSegments = parsedParamMap.get(item.text);
+      translatedValuesMap[item.text] = reassembleWikitext(
+        subSegments,
+        translatedTexts,
+        translatedLinks,
+        translatedTemplates,
+        translatedTexts,
+        {},
+        {},
+        { missingLinkStrategy: options.missingLinkStrategy || 'translate', fromLang, toLang }
+      );
+    } else {
+      translatedValuesMap[item.text] = translatedTexts[item.text] || item.text;
+    }
+  }
+
+  stats.paramsTranslated = Object.keys(translatedValuesMap).length;
+
+  // 5. Reassemble template with target language parameter aliases applied
+  const translatedTemplate = reassembleTemplate(parsed, translatedName, translatedValuesMap, {}, toLang);
   stats.timingMs.total = Date.now() - startTime;
 
   return { translatedTemplate, parsed, stats };
