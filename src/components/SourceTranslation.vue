@@ -498,88 +498,32 @@
         </div>
 
         <!-- Publish Section -->
-        <div v-if="hasAnyTranslation" class="card-elevated p-5 sm:p-6 mb-12 border-t-4 border-primary-500">
-          <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100 mb-1">Publish to Wikipedia</h3>
-          <p class="text-xs text-slate-500 dark:text-zinc-400 mb-4">Publish your translated article directly to the target Wikipedia. Choose your target destination namespace below.</p>
-          
-          <!-- Destination Selector -->
-          <div class="flex items-center gap-2 mb-4 flex-wrap">
-            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mr-1">Destination:</span>
-            <button
-              type="button"
-              @click="publishDestination = 'mainspace'"
-              :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1',
-                publishDestination === 'mainspace'
-                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-white/[0.06] hover:bg-slate-200'
-              ]"
-            >
-              <span class="material-icons-round text-xs">public</span>
-              Mainspace (Direct Page)
-            </button>
-            <button
-              type="button"
-              @click="publishDestination = 'sandbox'"
-              :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1',
-                publishDestination === 'sandbox'
-                  ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-white/[0.06] hover:bg-slate-200'
-              ]"
-            >
-              <span class="material-icons-round text-xs">science</span>
-              User Sandbox (Draft)
-            </button>
-            <button
-              type="button"
-              @click="publishDestination = 'draft'"
-              :class="[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1',
-                publishDestination === 'draft'
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-white/[0.06] hover:bg-slate-200'
-              ]"
-            >
-              <span class="material-icons-round text-xs">edit_note</span>
-              Draft Namespace
-            </button>
+        <div v-if="hasAnyTranslation" class="card-elevated p-5 sm:p-6 mb-12 border-t-4 border-primary-500 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mb-1">
+              <span class="material-icons-round text-primary-500">publish</span>
+              Ready to Publish to Wikipedia?
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-zinc-400">Publish your translated article directly to {{ targetLanguageName }} Wikipedia (Mainspace, User Sandbox, or Draft).</p>
           </div>
-
-          <!-- Target Page Title Input & Publish Button -->
-          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div class="flex-1 relative">
-              <span class="material-icons-round absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">edit</span>
-              <input
-                v-model="publishTitle"
-                type="text"
-                class="input-field pl-9 py-2 text-xs font-medium"
-                :placeholder="publishPlaceholder"
-                :disabled="isPublishing"
-              />
-            </div>
-            <div class="w-full sm:w-auto">
-              <button
-                v-if="user"
-                @click="publishArticle"
-                :disabled="isPublishing || !publishTitle.trim()"
-                class="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs py-2.5"
-              >
-                <span class="material-icons-round text-sm" :class="{'animate-spin': isPublishing}">
-                  {{ isPublishing ? 'refresh' : 'publish' }}
-                </span>
-                {{ isPublishing ? 'Publishing...' : 'Publish Article' }}
-              </button>
-              <button
-                v-else
-                disabled
-                class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-1.5 opacity-60 cursor-not-allowed text-xs py-2.5"
-                title="Please login via the header to publish"
-              >
-                <span class="material-icons-round text-sm">lock</span>
-                Login to Publish
-              </button>
-            </div>
+          <div>
+            <button
+              v-if="user"
+              @click="openPublishModal"
+              class="btn-primary text-xs py-3 px-6 flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap"
+            >
+              <span class="material-icons-round text-base">publish</span>
+              <span class="font-bold">Publish to Wikipedia</span>
+            </button>
+            <a
+              v-else
+              href="/auth/login"
+              class="btn-secondary text-xs py-3 px-6 flex items-center gap-2 shadow-sm cursor-pointer whitespace-nowrap"
+              title="Login with your Wikipedia account to publish"
+            >
+              <span class="material-icons-round text-base">lock</span>
+              <span class="font-bold">Login to Publish</span>
+            </a>
           </div>
         </div>
       </div>
@@ -685,7 +629,21 @@
       :translatedWikitext="fullTranslatedText"
       :isSourceRtl="isSourceRtl"
       :isTargetRtl="isTargetRtl"
+      :user="user"
       @close-preview="closePreview"
+      @publish-from-preview="openPublishModal"
+    />
+
+    <!-- Publish Dialog Modal -->
+    <PublishModal
+      :showModal="showPublishModal"
+      :user="user"
+      :defaultTitle="publishTitle || articleInput"
+      :toLanguage="toLanguage"
+      :targetLanguageName="targetLanguageName"
+      :fullTranslatedText="fullTranslatedText"
+      @close="showPublishModal = false"
+      @published="handleArticlePublished"
     />
   </div>
 </template>
@@ -694,13 +652,14 @@
 import ParagraphSection from './ParagraphSection.vue';
 import ProgressBar from './ProgressBar.vue';
 import PreviewModal from './PreviewModal.vue';
+import PublishModal from './PublishModal.vue';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
 import { isRtlLanguage } from '../i18n.js';
 
 export default {
   name: 'SourceTranslation',
-  components: { ParagraphSection, ProgressBar, PreviewModal },
+  components: { ParagraphSection, ProgressBar, PreviewModal, PublishModal },
   props: {
     user: {
       type: Object,
@@ -713,6 +672,7 @@ export default {
       // Active Mode & Modals
       currentMode: 'article', // 'article' | 'template' | 'wikitext'
       showProviderModal: false,
+      showPublishModal: false,
 
       // Main toolbar state
       fromLanguage: 'en',
@@ -949,6 +909,10 @@ export default {
       if (this.toastType === 'success') return 'check_circle';
       if (this.toastType === 'warning') return 'warning';
       return 'error';
+    },
+    targetLanguageName() {
+      const lang = this.languages.find(l => l.code === this.toLanguage);
+      return lang ? lang.name : this.toLanguage;
     },
   },
 
@@ -1483,6 +1447,23 @@ export default {
     copyTemplateResult() {
       navigator.clipboard.writeText(this.templateTranslated)
         .then(() => this.showToast(this.$t('warnings.copied'), 'success'));
+    },
+
+    openPublishModal() {
+      if (!this.hasAnyTranslation) {
+        this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
+        return;
+      }
+      if (!this.toLanguage) {
+        this.toLanguageError = true;
+        this.showToast(this.$t('warnings.selectTarget'), 'warning');
+        return;
+      }
+      this.showPublishModal = true;
+    },
+
+    handleArticlePublished({ title, url }) {
+      this.showToast(`Article "${title}" published successfully!`, 'success');
     },
 
     exportWikitext() {

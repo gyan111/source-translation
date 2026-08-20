@@ -38,9 +38,29 @@
               </div>
             </div>
 
-            <button @click="closePreview" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors">
-              <span class="material-icons-round text-lg">close</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                v-if="user"
+                @click="$emit('publish-from-preview')"
+                class="btn-primary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer"
+                title="Publish directly to Wikipedia"
+              >
+                <span class="material-icons-round text-sm">publish</span>
+                <span>Publish to Wikipedia</span>
+              </button>
+              <a
+                v-else
+                href="/auth/login"
+                class="btn-secondary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer"
+                title="Login to your Wikipedia account to publish"
+              >
+                <span class="material-icons-round text-sm">lock</span>
+                <span>Login to Publish</span>
+              </a>
+              <button @click="closePreview" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors">
+                <span class="material-icons-round text-lg">close</span>
+              </button>
+            </div>
           </div>
 
           <!-- Body -->
@@ -101,6 +121,10 @@ export default {
     isTargetRtl: {
       type: Boolean,
       default: false,
+    },
+    user: {
+      type: Object,
+      default: null,
     },
   },
   data() {

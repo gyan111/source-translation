@@ -21,6 +21,11 @@ router.get('/login', (req, res) => {
     });
   }
 
+  // Save the originating frontend URL so we return back to the exact port (e.g. 5173)
+  if (req.session) {
+    req.session.returnTo = req.headers.referer || (process.env.NODE_ENV === 'production' ? '/' : 'http://localhost:5173/');
+  }
+
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: config.clientId,
@@ -41,10 +46,15 @@ router.get('/callback', async (req, res) => {
   const config = getOAuthConfig();
 
   try {
-    // Exchange code for access token
+    // Exchange code for access token (supporting both HTTP Basic Auth header and body parameters)
+    const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64');
     const tokenResponse = await fetch(config.tokenUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${basicAuth}`,
+        'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
+      },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
@@ -74,8 +84,10 @@ router.get('/callback', async (req, res) => {
       accessToken: tokenData.access_token,
     };
 
-    // Redirect to frontend
-    res.redirect('/');
+    // Redirect back to originating frontend (e.g. localhost:5173 or / in production)
+    const returnTo = req.session.returnTo || (process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production' ? '/' : 'http://localhost:5173/'));
+    delete req.session.returnTo;
+    res.redirect(returnTo);
   } catch (error) {
     console.error('OAuth callback error:', error);
     res.status(500).send('Authentication failed. Please try again.');

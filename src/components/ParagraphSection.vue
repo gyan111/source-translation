@@ -1,16 +1,23 @@
 <template>
   <div
     :id="`paragraph-section-${index}`"
-    class="card-elevated p-4 sm:p-5 transition-all duration-300 relative group"
+    class="card-elevated p-4 sm:p-5 transition-all duration-300 relative group overflow-hidden"
     :class="[
       status === 'translating'
-        ? 'ring-2 ring-primary-500/80 shadow-lg shadow-primary-500/10 border-primary-400 dark:border-primary-500/80 bg-primary-50/20 dark:bg-primary-950/10'
+        ? 'ring-2 ring-primary-500 shadow-xl shadow-primary-500/20 border-primary-500 bg-primary-50/20 dark:bg-primary-950/20'
         : status === 'translated'
           ? 'border-slate-200 dark:border-white/[0.08] hover:border-emerald-300 dark:hover:border-emerald-700/50'
           : 'border-slate-200 dark:border-white/[0.06]'
     ]"
     :style="{ animationDelay: `${index * 40}ms` }"
   >
+    <!-- Moving Traveling Light Beam on Translating -->
+    <div
+      v-if="status === 'translating'"
+      class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-cyan-400 to-indigo-600 overflow-hidden rounded-t-2xl z-10"
+    >
+      <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/90 to-transparent animate-shimmer-fast"></div>
+    </div>
     <!-- Section Header & Toolbar -->
     <div class="flex items-center justify-between gap-2 mb-3">
       <div class="flex items-center gap-2">
@@ -115,8 +122,8 @@
       <div class="flex flex-col">
         <div class="flex items-center justify-between mb-1.5">
           <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 uppercase tracking-wider">
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-primary-100/80 dark:bg-primary-950/80 text-[10px] font-bold text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800/60">
-              <span class="material-icons-round text-[12px] mr-0.5">edit</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-primary-100 dark:bg-primary-900/90 text-[11px] font-bold text-primary-800 dark:text-primary-100 border border-primary-300 dark:border-primary-500/60 shadow-2xs">
+              <span class="material-icons-round text-[13px] mr-1 text-primary-600 dark:text-primary-300">edit</span>
               {{ $t('paragraph.translation') }}
             </span>
           </label>

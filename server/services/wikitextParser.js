@@ -186,7 +186,7 @@ export function parseWikitext(wikitext) {
       const inner = el.content.slice(2, -2);
       const pipeIdx = inner.indexOf('|');
       const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx).trim() : inner.trim();
-      const display = pipeIdx !== -1 ? inner.slice(pipeIdx + 1).trim() : null;
+      const display = pipeIdx !== -1 ? (inner.slice(pipeIdx + 1).trim() || null) : null;
 
       if (linkType === 'category') {
         protectedItems.push({
@@ -375,11 +375,11 @@ export const CATEGORY_PREFIX_MAP = {
   cs: 'Kategorie', cy: 'Categori', da: 'Kategori', de: 'Kategorie', el: 'Κατηγορία', en: 'Category',
   eo: 'Kategorio', es: 'Categoría', et: 'Kategooria', eu: 'Kategoria', fa: 'رده', fi: 'Luokka',
   fr: 'Catégorie', ga: 'Catagóir', gl: 'Categoría', gu: 'શ્રેણી', he: 'קטגוריה', hi: 'श्रेणी',
-  hr: 'Kategorija', hu: 'Kategória', hy: 'Կատեգորիա', id: 'Kategori', is: 'Flokkur', it: 'Categoria',
-  ja: 'Category', jv: 'Kategori', ka: 'კატեգորիა', kn: 'ವರ್ಗ', ko: '분류', ku: 'Kategorî',
+  hr: 'Kategorija', hu: 'Kategória', hy: '\u053f\u0561\u057f\u0565\u0563\u0578\u0580\u056b\u0561', id: 'Kategori', is: 'Flokkur', it: 'Categoria',
+  ja: 'Category', jv: 'Kategori', ka: '\u10d9\u10d0\u10e2\u10d4\u10d2\u10dd\u10e0\u10d8\u10d0', kn: 'ವರ್ಗ', ko: '분류', ku: 'Kategorî',
   la: 'Categoria', lt: 'Kategorija', lv: 'Kategorija', mai: 'श्रेणी', ml: 'വർഗ്ഗം', mn: 'Ангилал',
   mr: 'वर्ग', ms: 'Kategori', my: 'ကဏ္ဍ', ne: 'श्रेणी', nl: 'Categorie', nn: 'Kategori',
-  no: 'Kategori', or: 'ଶ୍ରেਣੀ', pa: 'ਸ਼੍ਰেਣੀ', pl: 'Kategoria', ps: 'وېشنيزه', pt: 'Categoria',
+  no: 'Kategori', or: '\u0b36\u0b4d\u0b30\u0b47\u0b23\u0b40', pa: '\u0a38\u0a3c\u0a4d\u0a30\u0a47\u0a23\u0a40', pl: 'Kategoria', ps: 'وېشنيزه', pt: 'Categoria',
   ro: 'Categorie', ru: 'Категория', sa: 'वर्गः', sat: 'ᱛᱷᱚᱠ', sd: 'زمرو', sk: 'Kategória',
   sl: 'Kategorija', sq: 'Kategoria', sr: 'Категорија', su: 'Kategori', sv: 'Kategori', sw: 'Jamii',
   ta: 'பகுப்பு', te: 'వర్గం', th: 'หมวดหมู่', tl: 'Kategorya', tr: 'Kategori', uk: 'Категорія',
@@ -721,34 +721,29 @@ export function reassembleWikitext(
 
       // Category: translate target via Wikidata if resolved, localize namespace prefix
       case 'category': {
-        const translatedCat = translatedCategories[seg.target] ?? seg.target;
+        const targetPrefix = (toLang && CATEGORY_PREFIX_MAP[toLang]) || 'Category';
+        const colonIdx = seg.target.indexOf(':');
+        const cleanTarget = colonIdx !== -1 ? seg.target.slice(colonIdx + 1).trim() : seg.target.trim();
 
-        if (translatedCat && translatedCat !== seg.target) {
-          if (toLang && CATEGORY_PREFIX_MAP[toLang]) {
-            const targetPrefix = CATEGORY_PREFIX_MAP[toLang];
-            const colonIdx = translatedCat.indexOf(':');
-            const cleanTarget = colonIdx !== -1 ? translatedCat.slice(colonIdx + 1) : translatedCat;
-            if (seg.display) {
-              parts.push(`[[${targetPrefix}:${cleanTarget}|${seg.display}]]`);
-            } else {
-              parts.push(`[[${targetPrefix}:${cleanTarget}]]`);
-            }
+        const translatedCat = translatedCategories[seg.target] || translatedCategories[`Category:${cleanTarget}`] || translatedCategories[cleanTarget];
+        const isWikidataResolved = translatedCat && translatedCat !== seg.target && translatedCat !== `Category:${cleanTarget}`;
+
+        if (isWikidataResolved) {
+          const catColonIdx = translatedCat.indexOf(':');
+          const resolvedClean = catColonIdx !== -1 ? translatedCat.slice(catColonIdx + 1).trim() : translatedCat.trim();
+          const prefix = (toLang && CATEGORY_PREFIX_MAP[toLang]) || (catColonIdx !== -1 ? translatedCat.slice(0, catColonIdx) : 'Category');
+          if (seg.display && seg.display.trim()) {
+            parts.push(`[[${prefix}:${resolvedClean}|${seg.display.trim()}]]`);
           } else {
-            if (seg.display) {
-              parts.push(`[[${translatedCat}|${seg.display}]]`);
-            } else {
-              parts.push(`[[${translatedCat}]]`);
-            }
+            parts.push(`[[${prefix}:${resolvedClean}]]`);
           }
         } else {
-          const targetPrefix = (toLang && CATEGORY_PREFIX_MAP[toLang]) || 'Category';
-          const colonIdx = seg.target.indexOf(':');
-          const cleanTarget = colonIdx !== -1 ? seg.target.slice(colonIdx + 1) : seg.target;
+          // Translate category name text after colon via MT
           const translatedTargetName = (unresolvedTranslatedTargets && unresolvedTranslatedTargets[cleanTarget]) || cleanTarget;
-          if (seg.display) {
-            parts.push(`[[${targetPrefix}:${translatedTargetName}|${seg.display}]]`);
+          if (seg.display && seg.display.trim()) {
+            parts.push(`[[${targetPrefix}:${translatedTargetName.trim()}|${seg.display.trim()}]]`);
           } else {
-            parts.push(`[[${targetPrefix}:${translatedTargetName}]]`);
+            parts.push(`[[${targetPrefix}:${translatedTargetName.trim()}]]`);
           }
         }
         break;
