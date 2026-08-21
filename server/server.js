@@ -50,7 +50,21 @@ app.use(session({
   },
 }));
 
-app.use(express.static(path.join(__dirname, '../dist')));
+// Serve static assets with correct cache headers
+// Hashed assets (/assets/*) are immutable; index.html is never cached so users get new builds instantly
+app.use(express.static(path.join(__dirname, '../dist'), {
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (filePath.includes('/assets/')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  },
+}));
 
 app.use('/translate', translateRoute);
 app.use('/preview', previewRoute);
@@ -63,8 +77,17 @@ app.get('/callback', (req, res) => {
   res.redirect(`/auth/callback${query ? '?' + query : ''}`);
 });
 
-// Fallback for Single Page Application routing
+// Return 404 for missing static assets instead of serving index.html
+// This prevents "Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of text/html"
+app.use('/assets', (req, res) => {
+  res.status(404).send('Asset not found');
+});
+
+// Fallback for Single Page Application routing (always send with no-cache headers)
 app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
