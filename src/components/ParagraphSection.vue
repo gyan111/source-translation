@@ -26,9 +26,13 @@
         </span>
         
         <!-- Status Badges -->
-        <span v-if="status === 'translated'" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold border border-emerald-200 dark:border-emerald-800/60">
-          <span class="material-icons-round text-xs">check_circle</span>
-          {{ $t('paragraph.translated') }}
+        <span v-if="status === 'translated' && reviewed" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold border border-emerald-300 dark:border-emerald-800/60 shadow-2xs">
+          <span class="material-icons-round text-xs">verified</span>
+          {{ $t('paragraph.reviewed') }}
+        </span>
+        <span v-else-if="status === 'translated' && !reviewed" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-xs font-semibold border border-amber-300 dark:border-amber-800/60 animate-pulse">
+          <span class="material-icons-round text-xs">help_outline</span>
+          {{ $t('paragraph.needsReview') }}
         </span>
         <span v-else-if="status === 'translating'" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-800/60 animate-pulse">
           <span class="material-icons-round text-xs animate-spin">refresh</span>
@@ -38,10 +42,33 @@
           <span class="material-icons-round text-xs">error</span>
           Error
         </span>
+
+        <!-- Human Modification % Badge (Informational) -->
+        <span v-if="status === 'translated' && modificationPercent > 0" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[10px] font-semibold border border-blue-200/80 dark:border-blue-800/40" title="Percentage of machine translation edited by human">
+          <span class="material-icons-round text-[11px]">edit</span>
+          <span>{{ modificationPercent }}% edited</span>
+        </span>
       </div>
 
       <!-- Right Action Controls -->
       <div class="flex items-center gap-1.5">
+        <!-- Mark as Reviewed Toggle Button -->
+        <button
+          v-if="translation && status === 'translated'"
+          type="button"
+          @click="$emit('toggle-reviewed', index)"
+          class="px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer border"
+          :class="[
+            reviewed
+              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60 shadow-2xs'
+              : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700/60'
+          ]"
+          :title="reviewed ? 'Mark as unreviewed' : 'Mark this section as reviewed by human'"
+        >
+          <span class="material-icons-round text-[14px]">{{ reviewed ? 'verified' : 'fact_check' }}</span>
+          <span class="hidden sm:inline">{{ reviewed ? $t('paragraph.reviewed') : $t('paragraph.markReviewed') }}</span>
+        </button>
+
         <!-- View Mode Switcher: Edit vs Preview -->
         <div v-if="translation" class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium mr-1">
           <button
@@ -278,6 +305,7 @@
 
 <script>
 import axios from 'axios';
+import { calculateModificationPercent } from '../utils/diffHelper.js';
 
 export default {
   name: 'ParagraphSection',
@@ -285,6 +313,10 @@ export default {
     index: Number,
     source: String,
     translation: String,
+    originalTranslation: {
+      type: String,
+      default: '',
+    },
     status: {
       type: String,
       default: 'pending', // 'pending' | 'translating' | 'translated' | 'error'
@@ -301,6 +333,10 @@ export default {
       type: String,
       default: '',
     },
+    reviewed: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -314,6 +350,10 @@ export default {
     renderedPreviewHtml() {
       if (!this.translation) return '<p class="text-slate-400 italic">No translation to preview</p>';
       return this.renderSimpleWikitext(this.translation);
+    },
+    modificationPercent() {
+      if (!this.originalTranslation || !this.translation) return 0;
+      return calculateModificationPercent(this.originalTranslation, this.translation);
     },
   },
   methods: {

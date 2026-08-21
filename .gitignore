@@ -25,6 +25,9 @@ dist-ssr
 
 # Internal local documentation
 TOOL_GUIDE.md
+INTERNAL_*.md
+docs/internal/
+*.internal.md
 
 # Environment variables
 .env

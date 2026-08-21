@@ -451,6 +451,14 @@
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
           {{ translatedCount }} {{ $t('paragraph.translated') }}
         </span>
+        <span v-if="translatedCount > 0" class="flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full border text-[11px]" :class="isFullyReviewed ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700/60'">
+          <span class="material-icons-round text-[13px]">{{ isFullyReviewed ? 'verified' : 'fact_check' }}</span>
+          <span>Reviewed: {{ reviewedCount }}/{{ translatedCount }}</span>
+        </span>
+        <span v-if="translatedCount > 0 && totalModificationPercent > 0" class="flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full border text-[11px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60" title="Total translation modified by human editor">
+          <span class="material-icons-round text-[13px]">edit</span>
+          <span>{{ totalModificationPercent }}% edited</span>
+        </span>
         <span class="flex items-center gap-1">
           <span class="w-2 h-2 rounded-full bg-slate-300 dark:bg-zinc-700"></span>
           {{ paragraphs.length - translatedCount }} {{ $t('paragraph.pending') }}
@@ -488,12 +496,15 @@
             :index="idx"
             :source="para.source"
             :translation="para.translation"
+            :originalTranslation="para.rawTranslation || para.translation"
             :status="para.status"
+            :reviewed="para.reviewed || false"
             :isSourceRtl="isSourceRtl"
             :isTargetRtl="isTargetRtl"
             :targetLang="toLanguage"
             @translate-paragraph="translateParagraph"
             @update-translation="updateTranslation"
+            @toggle-reviewed="toggleReviewed"
           />
         </div>
 
@@ -642,6 +653,10 @@
       :toLanguage="toLanguage"
       :targetLanguageName="targetLanguageName"
       :fullTranslatedText="fullTranslatedText"
+      :reviewedCount="reviewedCount"
+      :totalSectionsCount="paragraphs.length"
+      :isFullyReviewed="isFullyReviewed"
+      :modificationPercent="totalModificationPercent"
       @close="showPublishModal = false"
       @published="handleArticlePublished"
     />
@@ -656,6 +671,7 @@ import PublishModal from './PublishModal.vue';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
 import { isRtlLanguage } from '../i18n.js';
+import { calculateModificationPercent } from '../utils/diffHelper.js';
 
 export default {
   name: 'SourceTranslation',
@@ -913,6 +929,22 @@ export default {
     targetLanguageName() {
       const lang = this.languages.find(l => l.code === this.toLanguage);
       return lang ? lang.name : this.toLanguage;
+    },
+    reviewedCount() {
+      return this.paragraphs.filter(p => p.translation && p.reviewed).length;
+    },
+    reviewProgressPercent() {
+      if (!this.translatedCount) return 0;
+      return Math.round((this.reviewedCount / this.translatedCount) * 100);
+    },
+    isFullyReviewed() {
+      return this.paragraphs.length > 0 && this.translatedCount > 0 && this.paragraphs.every(p => !p.translation || p.reviewed);
+    },
+    totalModificationPercent() {
+      const originalAll = this.paragraphs.map(p => p.rawTranslation || '').filter(Boolean).join(' ');
+      const currentAll = this.paragraphs.map(p => p.translation || '').filter(Boolean).join(' ');
+      if (!originalAll || !currentAll) return 0;
+      return calculateModificationPercent(originalAll, currentAll);
     },
   },
 
@@ -1231,7 +1263,9 @@ export default {
       this.paragraphs = parts.map(source => ({
         source: source.trim(),
         translation: '',
+        rawTranslation: '',
         status: 'pending',
+        reviewed: false,
       }));
     },
 
@@ -1298,8 +1332,10 @@ export default {
         
         // Backend returns { translatedText, stats }
         para.translation = response.data?.translatedText || response.data?.translation || response.data?.text || '';
+        para.rawTranslation = para.translation;
         
         para.status = para.translation ? 'translated' : 'error';
+        para.reviewed = false; // Machine translated content requires human verification
         if (!para.translation) {
           this.showToast(this.$t('warnings.translationError'));
         } else if (response.data?.stats) {
@@ -1316,9 +1352,22 @@ export default {
       }
     },
 
-    updateTranslation(index, value) {
-      this.paragraphs[index].translation = value;
-      if (value) this.paragraphs[index].status = 'translated';
+    updateTranslation(index, value, autoMarkReviewed = true) {
+      if (this.paragraphs[index]) {
+        this.paragraphs[index].translation = value;
+        if (autoMarkReviewed && value) {
+          this.paragraphs[index].reviewed = true;
+        }
+        this.paragraphs[index].status = value ? 'translated' : 'pending';
+        this.saveState();
+      }
+    },
+
+    toggleReviewed(index) {
+      if (this.paragraphs[index]) {
+        this.paragraphs[index].reviewed = !this.paragraphs[index].reviewed;
+        this.saveState();
+      }
     },
 
     async translateWikitextMode() {
@@ -1434,9 +1483,18 @@ export default {
     },
 
     copyAll() {
-      if (!this.hasAnyTranslation) { this.showToast(this.$t('warnings.emptyTranslation'), 'warning'); return; }
+      if (!this.hasAnyTranslation) {
+        this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
+        return;
+      }
       navigator.clipboard.writeText(this.fullTranslatedText)
-        .then(() => this.showToast(this.$t('warnings.copied'), 'success'));
+        .then(() => {
+          if (!this.isFullyReviewed) {
+            this.showToast('Copied to clipboard! ⚠️ Please proofread unreviewed machine translation before publishing on Wikipedia.', 'warning');
+          } else {
+            this.showToast(this.$t('warnings.copied'), 'success');
+          }
+        });
     },
 
     copyWikitextResult() {
@@ -1467,7 +1525,10 @@ export default {
     },
 
     exportWikitext() {
-      if (!this.hasAnyTranslation) { this.showToast(this.$t('warnings.emptyTranslation'), 'warning'); return; }
+      if (!this.hasAnyTranslation) {
+        this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
+        return;
+      }
       const blob = new Blob([this.fullTranslatedText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1475,7 +1536,11 @@ export default {
       a.download = `${this.articleInput || 'translated'}_${this.toLanguage}.wiki`;
       a.click();
       URL.revokeObjectURL(url);
-      this.showToast(this.$t('warnings.exported'), 'success');
+      if (!this.isFullyReviewed) {
+        this.showToast('Wikitext exported! ⚠️ Please proofread unreviewed text before publishing to Wikipedia.', 'warning');
+      } else {
+        this.showToast(this.$t('warnings.exported'), 'success');
+      }
     },
 
     async publishArticle() {

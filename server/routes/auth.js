@@ -101,12 +101,16 @@ router.post('/logout', (req, res) => {
   });
 });
 
+import { isVerifiedUser } from '../config/verifiedUsers.js';
+
 // Get current user
 router.get('/user', (req, res) => {
   if (req.session && req.session.user) {
+    const username = req.session.user.username;
     res.json({
-      username: req.session.user.username,
+      username: username,
       id: req.session.user.id,
+      canPublishMainspace: isVerifiedUser(username),
     });
   } else {
     res.json(null);

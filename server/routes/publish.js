@@ -1,4 +1,5 @@
 import express from 'express';
+import { isVerifiedUser } from '../config/verifiedUsers.js';
 
 const router = express.Router();
 
@@ -16,6 +17,16 @@ router.post('/', async (req, res) => {
     return res.status(400).json({
       error: 'Missing required fields',
       message: 'text, language, and title are required.',
+    });
+  }
+
+  // Phase 1 Guard: Check if publishing to Mainspace and verify user
+  const isMainspace = !title.startsWith('User:') && !title.startsWith('Draft:');
+  const username = req.session.user.username;
+  if (isMainspace && !isVerifiedUser(username)) {
+    return res.status(403).json({
+      error: 'Mainspace Restricted',
+      message: 'Direct Mainspace publishing is currently restricted to verified users during Phase 1 beta. Please publish to your User Sandbox (Draft) or Draft namespace.',
     });
   }
 

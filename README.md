@@ -68,6 +68,17 @@ cd doc && mkdocs serve
 
 ---
 
+## 🛡️ Quality Assurance & Community Standards
+
+Source Translation Tool is designed as a **human-in-the-loop translation workbench**, adhering strictly to Wikimedia's translation guidelines:
+
+* **Human-Reviewed Translation:** Raw machine translations serve only as a starting draft. The tool incorporates interactive section-by-section review mechanisms to encourage thorough proofreading before publishing.
+* **Sandbox & Draft First:** New and in-progress translations can be published directly to user workspaces (`User:Username/Article`) or the `Draft:` namespace for community collaboration.
+* **Responsible Rollout:** During Phase 1 beta, publishing controls are in place to ensure translations meet local community standards.
+* **Accountability:** All publication actions require authenticated Wikimedia OAuth accounts and are attributed to registered editors.
+
+---
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
