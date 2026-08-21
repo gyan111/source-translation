@@ -3,12 +3,12 @@ import express from 'express';
 const router = express.Router();
 
 const getOAuthConfig = () => ({
-  clientId: process.env.OAUTH_CONSUMER_KEY || '',
-  clientSecret: process.env.OAUTH_CONSUMER_SECRET || '',
+  clientId: process.env.WIKI_CLIENT_ID || process.env.OAUTH_CONSUMER_KEY || '',
+  clientSecret: process.env.WIKI_CLIENT_SECRET || process.env.OAUTH_CONSUMER_SECRET || '',
   authorizationUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/authorize',
   tokenUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/access_token',
   profileUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/resource/profile',
-  callbackUrl: process.env.OAUTH_CALLBACK_URL || 'http://localhost:8000/callback',
+  callbackUrl: process.env.WIKI_CALLBACK_URL || process.env.OAUTH_CALLBACK_URL || 'http://localhost:8000/callback',
 });
 
 // Login - redirect to Wikimedia authorization
