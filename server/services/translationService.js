@@ -180,15 +180,25 @@ async function mintTranslate(text, fromLang, toLang, _options) {
     }
   }
 
-  // 3. Fallback: Google Free GTX translation (near-instant ~300ms)
+  // 3. Fallback: Google Free GTX translation via POST (handles large paragraphs without URL limits)
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${fromLang}&tl=${toLang}&dt=t&q=${encodeURIComponent(text)}`;
-    const response = await axios.get(url, {
-      timeout: 5000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SourceTranslationTool/2.0)',
-      },
-    });
+    const response = await axios.post(
+      'https://translate.googleapis.com/translate_a/single',
+      new URLSearchParams({
+        client: 'gtx',
+        sl: fromLang,
+        tl: toLang,
+        dt: 't',
+        q: text,
+      }).toString(),
+      {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        },
+      }
+    );
 
     if (response.data && response.data[0]) {
       const translated = response.data[0].map(chunk => chunk[0]).filter(Boolean).join('');

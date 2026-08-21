@@ -455,8 +455,8 @@
           <span class="material-icons-round text-[13px]">{{ isFullyReviewed ? 'verified' : 'fact_check' }}</span>
           <span>Reviewed: {{ reviewedCount }}/{{ translatedCount }}</span>
         </span>
-        <span v-if="translatedCount > 0 && totalModificationPercent > 0" class="flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full border text-[11px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60" title="Total translation modified by human editor">
-          <span class="material-icons-round text-[13px]">edit</span>
+        <span v-if="translatedCount > 0" class="flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full border text-[11px] transition-all" :class="totalModificationPercent > 0 ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60' : 'bg-slate-100 dark:bg-zinc-800/80 text-slate-500 dark:text-zinc-400 border-slate-200/60 dark:border-white/[0.06]'" title="Total translation modified by human editor">
+          <span class="material-icons-round text-[13px]">{{ totalModificationPercent > 0 ? 'edit' : 'auto_fix_normal' }}</span>
           <span>{{ totalModificationPercent }}% edited</span>
         </span>
         <span class="flex items-center gap-1">

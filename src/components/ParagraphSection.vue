@@ -44,8 +44,17 @@
         </span>
 
         <!-- Human Modification % Badge (Informational) -->
-        <span v-if="status === 'translated' && modificationPercent > 0" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[10px] font-semibold border border-blue-200/80 dark:border-blue-800/40" title="Percentage of machine translation edited by human">
-          <span class="material-icons-round text-[11px]">edit</span>
+        <span
+          v-if="status === 'translated' && translation"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all"
+          :class="[
+            modificationPercent > 0
+              ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/40'
+              : 'bg-slate-100 dark:bg-zinc-800/80 text-slate-500 dark:text-zinc-400 border-slate-200/60 dark:border-white/[0.06]'
+          ]"
+          :title="modificationPercent > 0 ? `${modificationPercent}% of machine translation modified by human` : 'Original machine translation (0% edited)'"
+        >
+          <span class="material-icons-round text-[11px]">{{ modificationPercent > 0 ? 'edit' : 'auto_fix_normal' }}</span>
           <span>{{ modificationPercent }}% edited</span>
         </span>
       </div>
