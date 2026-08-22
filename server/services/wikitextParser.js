@@ -397,6 +397,8 @@ export const REFLIST_TEMPLATE_MAP = {
   ru: 'Примечания', ta: 'சான்றுகள்', te: 'మూలాలు', ur: 'حوالہ جات', zh: 'Reflist',
 };
 
+import { normalizeToAsciiDigits, isPureNumericOrDateOrCode } from './numeralConverter.js';
+
 /**
  * Determines whether a template parameter value represents translatable text.
  */
@@ -416,37 +418,13 @@ export function isTranslatableParamValue(val, paramName = '') {
     return false;
   }
 
-  // Protect language code parameters (e.g. native_name_lang = or)
-  if ((normalizedKey.includes('lang') || normalizedKey.includes('code')) && /^[a-zA-Z]{2,4}(?:-[a-zA-Z0-9]+)?$/.test(t)) {
-    return false;
-  }
-
-  // Protect single direction letters (N, S, E, W)
-  if (/^[NSEWnsew]$/.test(t)) {
-    return false;
-  }
-
-  // Protect keywords: auto, metric, imperial, inline, title, boolean flags
-  if (['auto', 'metric', 'imperial', 'inline', 'title', 'inline,title', 'yes', 'no', 'true', 'false'].includes(t.toLowerCase())) {
-    return false;
-  }
-
   // Protect any string ending in a media file extension (including filenames with spaces, commas, dates)
   if (/\.(?:jpg|jpeg|png|svg|gif|webp|tiff|tif|pdf|ogg|oga|ogv|mp3|mp4|wav|flac|webm|avi|mov)$/i.test(t)) {
     return false;
   }
 
-  // Protect ASCII & Decimal numbers (e.g. 20.50, 86.42, 47006)
-  if (/^[+-]?\d+(?:\.\d+)?$/.test(t)) return false;
-
-  // Protect numbers with units (e.g. 13 m, 20 km, 50 px)
-  if (/^[+-]?\d+(?:\.\d+)?\s*(?:px|em|%|km|m|cm|kg|g|°|ft|in|ha|acre|acres|sqmi|sqkm)$/i.test(t)) return false;
-  if (/^\d+\s*[×x]\s*\d+\s*(?:px)?$/i.test(t)) return false;
-  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return false;
-  if (/^\+?\d[\d\s-]{4,}$/.test(t)) return false;
-
-  // Protect Indic and Arabic numerals / phone codes / offsets (e.g. ୧୩, +୫:୩୦, ୯୧-୬୭୨୭)
-  if (/^[+−-]?[\d\u0966-\u096F\u0B66-\u0B6F\u0A66-\u0A6F\u09E6-\u09EF\u0C66-\u0C6F\u0CE6-\u0CEF\u0D66-\u0D6F\u0BE6-\u0BEF\u0660-\u0669\s:.-]+$/.test(t)) {
+  // Universal check: numbers, coordinates, dates, units, offsets, direction letters, flags, and language codes
+  if (isPureNumericOrDateOrCode(t, paramName)) {
     return false;
   }
 
@@ -926,7 +904,10 @@ export function reassembleTemplate(
       }
       const rawKey = p.name ? p.name.trim().toLowerCase() : '';
       const pName = translatedParamNames[p.name] || langAliases[rawKey] || p.name;
-      const pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
+      let pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
+      if (pVal && typeof pVal === 'string' && !pVal.startsWith('<!--')) {
+        pVal = normalizeToAsciiDigits(pVal);
+      }
       if (p.isNamed) {
         lines.push(`| ${pName} = ${pVal}`);
       } else {
@@ -941,7 +922,10 @@ export function reassembleTemplate(
       if (p.isComment) return p.value;
       const rawKey = p.name ? p.name.trim().toLowerCase() : '';
       const pName = translatedParamNames[p.name] || langAliases[rawKey] || p.name;
-      const pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
+      let pVal = translatedParamValues[p.value] ?? translatedParamValues[p.name] ?? p.value;
+      if (pVal && typeof pVal === 'string' && !pVal.startsWith('<!--')) {
+        pVal = normalizeToAsciiDigits(pVal);
+      }
       return p.isNamed ? `${pName} = ${pVal}` : pVal;
     });
     const hasSpaceBeforeFirstPipe = parsedTemplate.raw && parsedTemplate.raw.startsWith(`{{${parsedTemplate.name} `);

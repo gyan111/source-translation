@@ -136,6 +136,10 @@ describe('translationPipeline', () => {
 | subdivision_name1 = [[ଓଡ଼ିଶା]]
 | established_title = <!-- Established -->
 | established_date = ୧୦ ମାର୍ଚ୍ଚ ୧୮୬୯
+| elevation_m = ୧୩
+| population_as_of = ୨୦୦୧
+| utc_offset1 = +୫:୩୦
+| area_code = ୯୧-୬୭୨୭
 }}`;
 
     const { translatedTemplate, stats } = await translateTemplate(template, 'or', 'en', 'mint');
@@ -147,6 +151,10 @@ describe('translationPipeline', () => {
     expect(translatedTemplate).toContain('| latNS = N');
     expect(translatedTemplate).toContain('| subdivision_name1 = [[Odisha]]');
     expect(translatedTemplate).toContain('| established_title = <!-- Established -->');
+    expect(translatedTemplate).toContain('| elevation_m = 13');
+    expect(translatedTemplate).toContain('| population_as_of = 2001');
+    expect(translatedTemplate).toContain('| utc_offset1 = +5:30');
+    expect(translatedTemplate).toContain('| area_code = 91-6727');
     expect(stats.errors).toEqual([]);
   });
 });

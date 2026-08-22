@@ -11,6 +11,7 @@ import {
   reassembleTemplate,
   isTranslatableParamValue,
 } from '../server/services/wikitextParser.js';
+import { normalizeToAsciiDigits } from '../server/services/numeralConverter.js';
 
 describe('wikitextParser', () => {
   describe('parseWikitext', () => {
@@ -381,7 +382,31 @@ describe('wikitextParser', () => {
         expect(isTranslatableParamValue('ଭାଷା', 'demographics_type1')).toBe(true);
       });
     });
+
+    describe('numeralConverter', () => {
+      it('converts Indic and Arabic digits to ASCII digits seamlessly', () => {
+        // Odia numerals
+        expect(normalizeToAsciiDigits('୧୩')).toBe('13');
+        expect(normalizeToAsciiDigits('୨୦୦୧')).toBe('2001');
+        expect(normalizeToAsciiDigits('+୫:୩୦')).toBe('+5:30');
+        expect(normalizeToAsciiDigits('୯୧-୬୭୨୭')).toBe('91-6727');
+        expect(normalizeToAsciiDigits('୧୦ ମାର୍ଚ୍ଚ ୧୮୬୯')).toBe('10 ମାର୍ଚ୍ଚ 1869');
+
+        // Devanagari (Hindi) numerals
+        expect(normalizeToAsciiDigits('२००१')).toBe('2001');
+        expect(normalizeToAsciiDigits('१३')).toBe('13');
+
+        // Gurmukhi (Punjabi) numerals
+        expect(normalizeToAsciiDigits('੨੦੦੧')).toBe('2001');
+        expect(normalizeToAsciiDigits('੧੩')).toBe('13');
+
+        // Bengali numerals
+        expect(normalizeToAsciiDigits('২০০১')).toBe('2001');
+      });
+    });
   });
 });
+
+
 
 
