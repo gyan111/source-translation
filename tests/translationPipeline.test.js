@@ -129,7 +129,10 @@ describe('translationPipeline', () => {
 
     const template = `{{Infobox settlement
 | name = କେନ୍ଦ୍ରାପଡ଼ା
+| native_name_lang = or
 | settlement_type = ସହର
+| latd = 20.50
+| latNS = N
 | subdivision_name1 = [[ଓଡ଼ିଶା]]
 | established_title = <!-- Established -->
 | established_date = ୧୦ ମାର୍ଚ୍ଚ ୧୮୬୯
@@ -139,7 +142,13 @@ describe('translationPipeline', () => {
 
     expect(translatedTemplate).toBeDefined();
     expect(translatedTemplate).toContain('{{Infobox settlement');
+    expect(translatedTemplate).toContain('| native_name_lang = or');
+    expect(translatedTemplate).toContain('| latd = 20.50');
+    expect(translatedTemplate).toContain('| latNS = N');
+    expect(translatedTemplate).toContain('| subdivision_name1 = [[Odisha]]');
+    expect(translatedTemplate).toContain('| established_title = <!-- Established -->');
     expect(stats.errors).toEqual([]);
   });
 });
+
 

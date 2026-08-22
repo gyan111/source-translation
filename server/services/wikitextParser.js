@@ -367,7 +367,11 @@ const PROTECTED_PARAM_NAMES = new Set([
   'registration_plate', 'postal_code', 'area_code', 'utc_offset', 'utc_offset1', 'coordinates',
   'coordinates_display', 'coordinates_footnotes', 'mapframe', 'mapsize', 'imagesize', 'unit_pref',
   'elevation_m', 'elevation_ft', 'area_rank', 'population_rank', 'website', 'url', 'doi', 'isbn',
-  'issn', 'pmid', 'pmc', 'arxiv'
+  'issn', 'pmid', 'pmc', 'arxiv',
+  'latd', 'latm', 'lats', 'latns', 'longd', 'longm', 'longs', 'longew',
+  'lat_d', 'lat_m', 'lat_s', 'lat_ns', 'long_d', 'long_m', 'long_s', 'long_ew',
+  'lat_deg', 'lat_min', 'lat_sec', 'lat_dir', 'lon_deg', 'lon_min', 'lon_sec', 'lon_dir',
+  'latitude', 'longitude', 'coor', 'coord', 'native_name_lang', 'iso_code', 'iso_3166_2', 'lang', 'language_code',
 ]);
 
 export const CATEGORY_PREFIX_MAP = {
@@ -377,7 +381,7 @@ export const CATEGORY_PREFIX_MAP = {
   fr: 'Catégorie', ga: 'Catagóir', gl: 'Categoría', gu: 'શ્રેણી', he: 'קטגוריה', hi: 'श्रेणी',
   hr: 'Kategorija', hu: 'Kategória', hy: '\u053f\u0561\u057f\u0565\u0563\u0578\u0580\u056b\u0561', id: 'Kategori', is: 'Flokkur', it: 'Categoria',
   ja: 'Category', jv: 'Kategori', ka: '\u10d9\u10d0\u10e2\u10d4\u10d2\u10dd\u10e0\u10d8\u10d0', kn: 'ವರ್ಗ', ko: '분류', ku: 'Kategorî',
-  la: 'Categoria', lt: 'Kategorija', lv: 'Kategorija', mai: 'श्रेणी', ml: 'വർഗ്ഗം', mn: 'Ангилал',
+  la: 'Categoria', lt: 'Kategorija', lv: 'Kategorija', mai: 'श्रेणी', ml: 'വർഗ്ഗം', mn: 'Ангилаલ',
   mr: 'वर्ग', ms: 'Kategori', my: 'ကဏ္ဍ', ne: 'श्रेणी', nl: 'Categorie', nn: 'Kategori',
   no: 'Kategori', or: '\u0b36\u0b4d\u0b30\u0b47\u0b23\u0b40', pa: '\u0a38\u0a3c\u0a4d\u0a30\u0a47\u0a23\u0a40', pl: 'Kategoria', ps: 'وېشنيزه', pt: 'Categoria',
   ro: 'Categorie', ru: 'Категория', sa: 'वर्गः', sat: 'ᱛᱷᱚᱠ', sd: 'زمرو', sk: 'Kategória',
@@ -401,9 +405,29 @@ export function isTranslatableParamValue(val, paramName = '') {
   const t = val.trim();
   if (t.length === 0) return false;
 
+  // Protect HTML comments: <!-- ... -->
+  if (t.startsWith('<!--') && t.endsWith('-->')) {
+    return false;
+  }
+
   // Protect known media/file/technical parameter keys
   const normalizedKey = (paramName || '').toLowerCase().replace(/[\s_-]+/g, '_');
   if (PROTECTED_PARAM_NAMES.has(normalizedKey) || normalizedKey.startsWith('image_') || normalizedKey.endsWith('_image') || normalizedKey.endsWith('_filename') || normalizedKey.endsWith('_file')) {
+    return false;
+  }
+
+  // Protect language code parameters (e.g. native_name_lang = or)
+  if ((normalizedKey.includes('lang') || normalizedKey.includes('code')) && /^[a-zA-Z]{2,4}(?:-[a-zA-Z0-9]+)?$/.test(t)) {
+    return false;
+  }
+
+  // Protect single direction letters (N, S, E, W)
+  if (/^[NSEWnsew]$/.test(t)) {
+    return false;
+  }
+
+  // Protect keywords: auto, metric, imperial, inline, title, boolean flags
+  if (['auto', 'metric', 'imperial', 'inline', 'title', 'inline,title', 'yes', 'no', 'true', 'false'].includes(t.toLowerCase())) {
     return false;
   }
 
@@ -412,11 +436,20 @@ export function isTranslatableParamValue(val, paramName = '') {
     return false;
   }
 
-  if (/^\d+$/.test(t)) return false;
-  if (/^\d+\s*(?:px|em|%|km|m|cm|kg|g|°|ft|in|ha|acre|acres|sqmi|sqkm)$/i.test(t)) return false;
+  // Protect ASCII & Decimal numbers (e.g. 20.50, 86.42, 47006)
+  if (/^[+-]?\d+(?:\.\d+)?$/.test(t)) return false;
+
+  // Protect numbers with units (e.g. 13 m, 20 km, 50 px)
+  if (/^[+-]?\d+(?:\.\d+)?\s*(?:px|em|%|km|m|cm|kg|g|°|ft|in|ha|acre|acres|sqmi|sqkm)$/i.test(t)) return false;
   if (/^\d+\s*[×x]\s*\d+\s*(?:px)?$/i.test(t)) return false;
   if (/^\d{4}-\d{2}-\d{2}/.test(t)) return false;
   if (/^\+?\d[\d\s-]{4,}$/.test(t)) return false;
+
+  // Protect Indic and Arabic numerals / phone codes / offsets (e.g. ୧୩, +୫:୩୦, ୯୧-୬୭୨୭)
+  if (/^[+−-]?[\d\u0966-\u096F\u0B66-\u0B6F\u0A66-\u0A6F\u09E6-\u09EF\u0C66-\u0C6F\u0CE6-\u0CEF\u0D66-\u0D6F\u0BE6-\u0BEF\u0660-\u0669\s:.-]+$/.test(t)) {
+    return false;
+  }
+
   if (/^https?:\/\//i.test(t)) return false;
   if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(t)) return false;
   return true;

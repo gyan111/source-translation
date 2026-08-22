@@ -395,6 +395,17 @@ export async function translateTemplate(templateWikitext, fromLang, toLang, serv
     stats.errors.push(`Batch translation error: ${err.message}`);
   }
 
+  // 3.5 Translate unresolved link targets (missing Wikidata sitelinks) via MT
+  const unresolvedLinkTargets = [...linkTargets].filter(t => !translatedLinks[t] || translatedLinks[t] === t);
+  let unresolvedTranslatedTargets = {};
+  if (unresolvedLinkTargets.length > 0) {
+    try {
+      unresolvedTranslatedTargets = await translateTexts(unresolvedLinkTargets, fromLang, toLang, service, options);
+    } catch {
+      for (const u of unresolvedLinkTargets) unresolvedTranslatedTargets[u] = u;
+    }
+  }
+
   // 4. Reassemble parameter values
   const translatedValuesMap = {};
   for (const item of translatableParams) {
@@ -408,7 +419,12 @@ export async function translateTemplate(templateWikitext, fromLang, toLang, serv
         translatedTexts,
         {},
         {},
-        { missingLinkStrategy: options.missingLinkStrategy || 'translate', fromLang, toLang }
+        {
+          missingLinkStrategy: options.missingLinkStrategy || 'translate',
+          fromLang,
+          toLang,
+          unresolvedTranslatedTargets,
+        }
       );
     } else {
       translatedValuesMap[item.text] = translatedTexts[item.text] || item.text;

@@ -9,6 +9,7 @@ import {
   normalizeWikitextSyntax,
   parseTemplate,
   reassembleTemplate,
+  isTranslatableParamValue,
 } from '../server/services/wikitextParser.js';
 
 describe('wikitextParser', () => {
@@ -357,6 +358,30 @@ describe('wikitextParser', () => {
       expect(reassembled).toContain('| population = 41404');
       expect(reassembled).toContain('| altitude = 13');
     });
+
+    describe('isTranslatableParamValue', () => {
+      it('protects coordinates, ISO language codes, directions, numbers, and comments', () => {
+        expect(isTranslatableParamValue('or', 'native_name_lang')).toBe(false);
+        expect(isTranslatableParamValue('20.50', 'latd')).toBe(false);
+        expect(isTranslatableParamValue('86.42', 'longd')).toBe(false);
+        expect(isTranslatableParamValue('N', 'latNS')).toBe(false);
+        expect(isTranslatableParamValue('E', 'longEW')).toBe(false);
+        expect(isTranslatableParamValue('<!-- Established -->', 'established_title')).toBe(false);
+        expect(isTranslatableParamValue('୧୩', 'elevation_m')).toBe(false);
+        expect(isTranslatableParamValue('+୫:୩୦', 'utc_offset1')).toBe(false);
+        expect(isTranslatableParamValue('୯୧-୬୭୨୭', 'area_code')).toBe(false);
+        expect(isTranslatableParamValue('inline,title', 'coordinates_display')).toBe(false);
+        expect(isTranslatableParamValue('auto', 'population_density_km2')).toBe(false);
+      });
+
+      it('identifies genuine translatable textual fields', () => {
+        expect(isTranslatableParamValue('ସହର', 'settlement_type')).toBe(true);
+        expect(isTranslatableParamValue('କେନ୍ଦ୍ରାପଡ଼ା', 'name')).toBe(true);
+        expect(isTranslatableParamValue('୧୦ ମାର୍ଚ୍ଚ ୧୮୬୯', 'established_date')).toBe(true);
+        expect(isTranslatableParamValue('ଭାଷା', 'demographics_type1')).toBe(true);
+      });
+    });
   });
 });
+
 
