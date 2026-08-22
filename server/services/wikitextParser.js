@@ -564,8 +564,12 @@ export function normalizeWikitextSyntax(wikitext) {
 
   let result = normalizedLines.join('\n');
 
-  // Fix extra spacing inside wikilinks: [[ Foo | Bar ]] -> [[Foo|Bar]]
-  result = result.replace(/\[\[\s*([^\]|]+?)\s*\|\s*([^\]]+?)\s*\]\]/g, '[[$1|$2]]');
+  // Fix extra spacing inside wikilinks and normalize [[ Foo | Foo ]] -> [[Foo]]
+  result = result.replace(/\[\[\s*([^\]|]+?)\s*\|\s*([^\]]+?)\s*\]\]/g, (match, target, display) => {
+    const t = target.trim();
+    const d = display.trim();
+    return t === d ? `[[${t}]]` : `[[${t}|${d}]]`;
+  });
   result = result.replace(/\[\[\s*([^\]|]+?)\s*\]\]/g, '[[$1]]');
 
   // Fix missing space between prose words and opening wikilinks: e.g. "ਪਿੰਡ[[ਕਟକ]]" or "le[[Père" -> "ਪਿੰਡ [[ਕਟକ]]", "le [[Père"
@@ -651,14 +655,22 @@ export function reassembleWikitext(
           const newTarget = resolvedTarget;
           if (seg.display) {
             const newDisplay = translatedDisplayTexts[seg.display] ?? seg.display;
-            parts.push(`[[${newTarget}|${newDisplay}]]`);
+            if (newDisplay === newTarget) {
+              parts.push(`[[${newTarget}]]`);
+            } else {
+              parts.push(`[[${newTarget}|${newDisplay}]]`);
+            }
           } else {
             let display = translatedDisplayTexts[seg.target] ?? newTarget;
             const parenMatch = display.match(/^(.+?)\s*\([^)]+\)$/);
             if (parenMatch && parenMatch[1].trim()) {
               display = parenMatch[1].trim();
             }
-            parts.push(`[[${newTarget}|${display}]]`);
+            if (display === newTarget) {
+              parts.push(`[[${newTarget}]]`);
+            } else {
+              parts.push(`[[${newTarget}|${display}]]`);
+            }
           }
         } else {
           // Article does NOT exist on target wiki (missing Wikidata sitelink)
