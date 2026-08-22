@@ -89,7 +89,7 @@ describe('wikitextParser', () => {
         translatedDisplayTexts
       );
 
-      expect(result).toBe('Bonjour [[Monde|Monde]]. {{Salutation | msg = welcome}}');
+      expect(result).toBe('Bonjour [[Monde]]. {{Salutation | msg = welcome}}');
     });
 
     it('translates headings and formats them on their own lines', () => {
