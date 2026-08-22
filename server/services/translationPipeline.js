@@ -311,7 +311,7 @@ export async function translateTemplate(templateWikitext, fromLang, toLang, serv
 
   if (templateSegments.length > 1 || segments.some(s => s.type !== 'template')) {
     // Process via full pipeline so ALL templates (Infoboxes + maintenance tags) are properly mapped and localized!
-    const res = await translateArticle(trimmed, fromLang, toLang, service, options);
+    const res = await translateWikitext(trimmed, fromLang, toLang, service, options);
     const firstTpl = templateSegments[0] ? parseTemplate(templateSegments[0].content) : { name: 'template' };
     return {
       translatedTemplate: res.translatedText,
@@ -381,7 +381,7 @@ export async function translateTemplate(templateWikitext, fromLang, toLang, serv
 
   try {
     const [linksRes, templatesRes, textsRes] = await Promise.all([
-      linkTargets.size > 0 ? translateLinkTitles([...linkTargets], fromLang, toLang) : Promise.resolve({}),
+      linkTargets.size > 0 ? translateTitlesViaWikidata([...linkTargets], fromLang, toLang) : Promise.resolve({}),
       templateNames.size > 0 ? translateTemplateNames([...templateNames], fromLang, toLang) : Promise.resolve({}),
       textsToTranslate.size > 0 ? translateTexts([...textsToTranslate], fromLang, toLang, service, options) : Promise.resolve({}),
     ]);

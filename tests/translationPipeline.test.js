@@ -100,4 +100,46 @@ describe('translationPipeline', () => {
     expect(translatedText).toContain('==');
     expect(translatedText).not.toContain('= =');
   });
+
+  it('translates complex infobox settlement template via translateTemplate', async () => {
+    // Mock Wikidata link titles
+    axios.get.mockResolvedValueOnce({
+      data: {
+        entities: {
+          Q1: { sitelinks: { orwiki: { title: 'ଓଡ଼ିଶା' }, enwiki: { title: 'Odisha' } } },
+        },
+      },
+    });
+
+    // Mock Wikidata template names
+    axios.get.mockResolvedValueOnce({
+      data: {
+        entities: {
+          Q2: { sitelinks: { orwiki: { title: 'Template:Infobox settlement' }, enwiki: { title: 'Template:Infobox settlement' } } },
+        },
+      },
+    });
+
+    // Mock text translation service
+    axios.post.mockResolvedValue({
+      data: {
+        translation: 'Kendrapara',
+      },
+    });
+
+    const template = `{{Infobox settlement
+| name = କେନ୍ଦ୍ରାପଡ଼ା
+| settlement_type = ସହର
+| subdivision_name1 = [[ଓଡ଼ିଶା]]
+| established_title = <!-- Established -->
+| established_date = ୧୦ ମାର୍ଚ୍ଚ ୧୮୬୯
+}}`;
+
+    const { translatedTemplate, stats } = await translateTemplate(template, 'or', 'en', 'mint');
+
+    expect(translatedTemplate).toBeDefined();
+    expect(translatedTemplate).toContain('{{Infobox settlement');
+    expect(stats.errors).toEqual([]);
+  });
 });
+
