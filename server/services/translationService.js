@@ -217,7 +217,7 @@ async function mintTranslate(text, fromLang, toLang, _options) {
       timeout: 4000,
       headers: {
         'Content-Type': 'text/plain',
-        'User-Agent': 'SourceTranslationTool/2.0',
+        'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
       },
     });
 

@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'Noto Sans Oriya', 'Noto Sans', 'system-ui', 'sans-serif'],
+        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Noto Sans Oriya"', 'Kalinga', '"Nirmala UI"', '"Noto Sans Bengali"', 'Vrinda', '"Noto Sans Devanagari"', 'Mangal', '"Noto Sans Tamil"', 'Latha', '"Noto Sans Telugu"', 'Gautami', '"Noto Sans"', 'sans-serif'],
       },
       colors: {
         primary: {

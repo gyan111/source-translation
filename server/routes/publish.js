@@ -11,7 +11,7 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const { text, language, title } = req.body;
+  const { text, language, title, sourceLanguage, sourceTitle } = req.body;
 
   if (!text || !language || !title) {
     return res.status(400).json({
@@ -50,13 +50,19 @@ router.post('/', async (req, res) => {
       throw new Error('Failed to obtain a valid CSRF token. Please log in again.');
     }
 
-    // 2. Publish Edit with OAuth Bearer Token & User-Agent
+    // 2. Format edit summary with source attribution (CC BY-SA compliance)
+    let editSummary = 'Created via Source Translation Tool (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)';
+    if (sourceTitle && sourceLanguage) {
+      editSummary = `Translated from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)`;
+    }
+
+    // 3. Publish Edit with OAuth Bearer Token & User-Agent
     const editUrl = `https://${language}.wikipedia.org/w/api.php`;
     const editParams = new URLSearchParams({
       action: 'edit',
       title: title,
       text: text,
-      summary: 'Created via Source Translation Tool (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
+      summary: editSummary,
       format: 'json',
       token: csrfToken,
       assert: 'user',

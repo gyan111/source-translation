@@ -651,6 +651,8 @@
       :user="user"
       :defaultTitle="publishTitle || articleInput"
       :toLanguage="toLanguage"
+      :fromLanguage="fromLanguage"
+      :sourceTitle="articleInput"
       :targetLanguageName="targetLanguageName"
       :fullTranslatedText="fullTranslatedText"
       :reviewedCount="reviewedCount"

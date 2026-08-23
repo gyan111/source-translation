@@ -332,6 +332,14 @@ export default {
       type: String,
       default: 'en',
     },
+    fromLanguage: {
+      type: String,
+      default: '',
+    },
+    sourceTitle: {
+      type: String,
+      default: '',
+    },
     targetLanguageName: {
       type: String,
       default: 'Target Wiki',
@@ -497,6 +505,8 @@ export default {
           text: this.fullTranslatedText,
           language: this.toLanguage,
           title: finalTitle,
+          sourceLanguage: this.fromLanguage,
+          sourceTitle: this.sourceTitle,
         });
 
         if (response.data && response.data.success) {

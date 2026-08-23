@@ -32,9 +32,7 @@ theme:
     - search.suggest
   icon:
     repo: fontawesome/brands/github
-  font:
-    text: Inter
-    code: JetBrains Mono
+  font: false
 
 plugins:
   - search
