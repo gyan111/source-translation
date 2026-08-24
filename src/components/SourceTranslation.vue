@@ -552,51 +552,196 @@
     <!-- Provider Configuration Modal -->
     <teleport to="body">
       <transition name="modal">
-        <div v-if="showProviderModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="showProviderModal = false">
+        <div v-if="showProviderModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto" @click.self="showProviderModal = false">
           <div class="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
-          <div class="relative w-full max-w-lg glass-strong rounded-3xl shadow-2xl p-6 border border-slate-200 dark:border-white/[0.1] animate-fade-in">
-            <div class="flex items-center justify-between mb-5">
+          <div class="relative w-full max-w-xl max-h-[92vh] overflow-y-auto glass-strong rounded-3xl shadow-2xl p-5 sm:p-6 border border-slate-200 dark:border-white/[0.1] animate-fade-in custom-scrollbar">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/[0.08] mb-4">
               <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                <div class="w-9 h-9 rounded-xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center shadow-sm">
                   <span class="material-icons-round text-lg">tune</span>
                 </div>
                 <div>
-                  <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100">Translation Engine</h3>
-                  <p class="text-xs text-slate-500 dark:text-zinc-400">Configure machine translation & AI providers</p>
+                  <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100">Translation Engine & Keys</h3>
+                  <p class="text-xs text-slate-500 dark:text-zinc-400">Configure machine translation services, AI models & credentials</p>
                 </div>
               </div>
-              <button @click="showProviderModal = false" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors">
+              <button @click="showProviderModal = false" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors" title="Close">
                 <span class="material-icons-round text-lg">close</span>
               </button>
             </div>
 
             <div class="space-y-4 text-xs">
+              <!-- Select Provider Dropdown -->
               <div>
-                <label class="field-label">Select Provider</label>
-                <select v-model="translationService" class="select-field">
-                  <option value="mint">Wikimedia MinT (100% Free, Recommended)</option>
-                  <option value="deepl">DeepL Translator (Free or Pro)</option>
+                <label class="field-label flex items-center justify-between">
+                  <span>Select Translation Provider</span>
+                  <span v-if="translationService === 'mint'" class="text-[11px] font-normal text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span class="material-icons-round text-xs">check_circle</span>
+                    Active (No Key Needed)
+                  </span>
+                </label>
+                <select v-model="translationService" class="select-field font-medium">
+                  <option value="mint">Wikimedia MinT (100% Free, Built-in)</option>
+                  <option value="deepl">DeepL Translator (Free 500k chars/mo or Pro)</option>
                   <option value="openai">OpenAI GPT (GPT-4o, GPT-4o-mini)</option>
-                  <option value="custom_openai">Universal AI (Groq, DeepSeek, Ollama, OpenRouter)</option>
-                  <option value="google">Google Cloud Translation</option>
-                  <option value="microsoft">Microsoft Azure Translator</option>
-                  <option value="libretranslate">LibreTranslate (Open-source)</option>
+                  <option value="custom_openai">Universal AI (Groq, DeepSeek, OpenRouter, Ollama)</option>
+                  <option value="google">Google Cloud Translation API</option>
+                  <option value="microsoft">Microsoft Azure Translator (Free 2M chars/mo)</option>
+                  <option value="libretranslate">LibreTranslate (Open-source / Self-hosted)</option>
                   <option value="custom_rest">Custom REST MT Endpoint</option>
                 </select>
               </div>
 
-              <div v-if="showApiKeyInput">
-                <label class="field-label">API Key / Auth Token</label>
-                <input v-model="serviceInput" type="password" class="input-field" :placeholder="apiKeyPlaceholder" />
-                <p v-if="translationService === 'deepl'" class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">For DeepL Free API, keys end in <code>:fx</code>.</p>
+              <!-- Universal AI Sub-presets (Groq / DeepSeek / OpenRouter / Ollama) -->
+              <div v-if="translationService === 'custom_openai'" class="p-3 rounded-2xl bg-slate-100/80 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-white/[0.08]">
+                <label class="field-label mb-2 flex items-center gap-1 text-[11px] text-slate-600 dark:text-zinc-400">
+                  <span class="material-icons-round text-xs text-primary-500">auto_awesome</span>
+                  Quick AI Provider Presets:
+                </label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  <button
+                    type="button"
+                    @click="selectUniversalPreset('groq')"
+                    :class="[
+                      'px-2.5 py-1.5 rounded-xl font-medium text-[11px] transition-all flex flex-col items-center justify-center text-center gap-0.5 border',
+                      activeUniversalPreset === 'groq'
+                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 shadow-xs'
+                        : 'bg-white/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border-transparent hover:border-slate-200 dark:hover:border-zinc-700'
+                    ]"
+                  >
+                    <span class="font-semibold">⚡ Groq</span>
+                    <span class="text-[9px] opacity-75">Fast & Free</span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="selectUniversalPreset('deepseek')"
+                    :class="[
+                      'px-2.5 py-1.5 rounded-xl font-medium text-[11px] transition-all flex flex-col items-center justify-center text-center gap-0.5 border',
+                      activeUniversalPreset === 'deepseek'
+                        ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40 shadow-xs'
+                        : 'bg-white/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border-transparent hover:border-slate-200 dark:hover:border-zinc-700'
+                    ]"
+                  >
+                    <span class="font-semibold">🧠 DeepSeek</span>
+                    <span class="text-[9px] opacity-75">Cost-effective</span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="selectUniversalPreset('openrouter')"
+                    :class="[
+                      'px-2.5 py-1.5 rounded-xl font-medium text-[11px] transition-all flex flex-col items-center justify-center text-center gap-0.5 border',
+                      activeUniversalPreset === 'openrouter'
+                        ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40 shadow-xs'
+                        : 'bg-white/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border-transparent hover:border-slate-200 dark:hover:border-zinc-700'
+                    ]"
+                  >
+                    <span class="font-semibold">🌐 OpenRouter</span>
+                    <span class="text-[9px] opacity-75">100+ Models</span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="selectUniversalPreset('ollama')"
+                    :class="[
+                      'px-2.5 py-1.5 rounded-xl font-medium text-[11px] transition-all flex flex-col items-center justify-center text-center gap-0.5 border',
+                      activeUniversalPreset === 'ollama'
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 shadow-xs'
+                        : 'bg-white/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border-transparent hover:border-slate-200 dark:hover:border-zinc-700'
+                    ]"
+                  >
+                    <span class="font-semibold">🛡️ Ollama</span>
+                    <span class="text-[9px] opacity-75">Local & Free</span>
+                  </button>
+                </div>
               </div>
 
+              <!-- Provider Key Guide Card -->
+              <div v-if="currentProviderGuide" class="p-3.5 sm:p-4 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-white/[0.08] space-y-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-slate-900 dark:text-zinc-100 text-xs sm:text-sm">{{ currentProviderGuide.title }}</span>
+                  </div>
+                  <span :class="['px-2.5 py-0.5 rounded-full text-[10px] font-semibold border', currentProviderGuide.badgeColor]">
+                    {{ currentProviderGuide.badge }}
+                  </span>
+                </div>
+
+                <p class="text-[11px] text-slate-600 dark:text-zinc-300 leading-relaxed">
+                  {{ currentProviderGuide.summary }}
+                </p>
+
+                <!-- Instructions Steps -->
+                <div class="space-y-1.5 pt-1">
+                  <div class="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                    <span class="material-icons-round text-xs text-primary-500">help_outline</span>
+                    <span>How to get and configure this key:</span>
+                  </div>
+                  <ol class="space-y-1 pl-4 list-decimal text-[11px] text-slate-600 dark:text-zinc-400 leading-relaxed">
+                    <li v-for="(step, sIdx) in currentProviderGuide.steps" :key="sIdx">
+                      {{ step }}
+                    </li>
+                  </ol>
+                </div>
+
+                <!-- Format note / tip -->
+                <div v-if="currentProviderGuide.note" class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] flex items-start gap-1.5">
+                  <span class="material-icons-round text-xs text-amber-500 shrink-0 mt-0.5">info</span>
+                  <span>{{ currentProviderGuide.note }}</span>
+                </div>
+
+                <!-- Direct External Link Button -->
+                <div v-if="currentProviderGuide.link" class="pt-1 flex items-center justify-between">
+                  <a
+                    :href="currentProviderGuide.link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary-500/10 hover:bg-primary-500/20 text-primary-600 dark:text-primary-400 border border-primary-500/30 transition-all group"
+                  >
+                    <span>{{ currentProviderGuide.linkText }}</span>
+                    <span class="material-icons-round text-xs transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">open_in_new</span>
+                  </a>
+                  <span class="text-[10px] text-slate-400 dark:text-zinc-500">Opens official portal in new tab</span>
+                </div>
+              </div>
+
+              <!-- API Key / Auth Token Input with Visibility Toggle -->
+              <div v-if="showApiKeyInput">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="field-label mb-0">API Key / Auth Token</label>
+                  <button
+                    type="button"
+                    @click="showApiKey = !showApiKey"
+                    class="text-[11px] text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center gap-1 transition-colors"
+                  >
+                    <span class="material-icons-round text-xs">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
+                    <span>{{ showApiKey ? 'Hide key' : 'Show key' }}</span>
+                  </button>
+                </div>
+                <div class="relative">
+                  <input
+                    v-model="serviceInput"
+                    :type="showApiKey ? 'text' : 'password'"
+                    class="input-field pr-9 font-mono text-xs"
+                    :placeholder="apiKeyPlaceholder"
+                  />
+                  <button
+                    type="button"
+                    @click="showApiKey = !showApiKey"
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors"
+                    :title="showApiKey ? 'Hide key' : 'Show key'"
+                  >
+                    <span class="material-icons-round text-sm">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- API Endpoint URL Input -->
               <div v-if="showEndpointInput">
                 <label class="field-label">API Endpoint URL</label>
                 <input v-model="serviceEndpoint" type="text" class="input-field font-mono text-xs" :placeholder="endpointPlaceholder" />
-                <p v-if="translationService === 'custom_openai'" class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">For local Ollama, use <code>http://localhost:11434/v1/chat/completions</code>.</p>
               </div>
 
+              <!-- Model Name Input -->
               <div v-if="showModelInput">
                 <label class="field-label">Model Name</label>
                 <input v-model="serviceModel" type="text" class="input-field font-mono text-xs" :placeholder="modelPlaceholder" />
@@ -618,9 +763,13 @@
               </div>
             </div>
 
-            <div class="mt-6 flex justify-end">
-              <button @click="showProviderModal = false" class="btn-primary w-full sm:w-auto text-xs px-5">
-                Done
+            <div class="mt-6 flex items-center justify-between border-t border-slate-200/80 dark:border-white/[0.08] pt-4">
+              <div class="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1">
+                <span class="material-icons-round text-xs text-emerald-500">lock</span>
+                <span>Keys stored locally in your browser</span>
+              </div>
+              <button @click="showProviderModal = false" class="btn-primary text-xs px-5 py-2">
+                Done & Save
               </button>
             </div>
           </div>
@@ -723,6 +872,8 @@ export default {
       serviceInput: '',
       serviceEndpoint: '',
       serviceModel: '',
+      activeUniversalPreset: 'groq', // 'groq' | 'deepseek' | 'openrouter' | 'ollama'
+      showApiKey: false,
       missingLinkStrategy: 'translate', // 'translate' | 'ill' | 'plain' | 'keep_source'
 
       // UI state
@@ -855,6 +1006,177 @@ export default {
       };
       return map[this.translationService] || 'Wikimedia MinT';
     },
+    currentProviderGuide() {
+      if (this.translationService === 'mint') {
+        return {
+          title: 'Wikimedia MinT',
+          badge: '100% Free & Open (No Key Required)',
+          badgeColor: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+          summary: 'Wikimedia\'s official hosted neural translation service powered by NLLB-200, Opus-MT, and Madlad-400.',
+          steps: [
+            'No registration or API key is required.',
+            'Built specifically for Wikipedia translation across 200+ languages.',
+            'Hosted and maintained by the Wikimedia Foundation on Toolforge infrastructure.',
+          ],
+          link: 'https://www.mediawiki.org/wiki/MinT',
+          linkText: 'Learn about Wikimedia MinT',
+        };
+      }
+      if (this.translationService === 'deepl') {
+        return {
+          title: 'DeepL Translator API',
+          badge: 'Free Tier: 500,000 Chars/Month',
+          badgeColor: 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+          summary: 'Industry-leading neural translation for European and major global languages.',
+          steps: [
+            'Sign up for a free DeepL API account at deepl.com/pro-api.',
+            'Navigate to Account Settings → API Keys tab.',
+            'Copy your Authentication Key and paste it into the field below.',
+          ],
+          note: 'Important: DeepL Free API keys always end in ":fx" (e.g. 12345678-abcd-...:fx). DeepL Pro keys do not have ":fx".',
+          link: 'https://www.deepl.com/your-account/keys',
+          linkText: 'Get DeepL API Key',
+        };
+      }
+      if (this.translationService === 'openai') {
+        return {
+          title: 'OpenAI GPT (GPT-4o, GPT-4o-mini)',
+          badge: 'Pay-as-you-go API',
+          badgeColor: 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 border-violet-200 dark:border-violet-800',
+          summary: 'Advanced LLM translation that excels at preserving complex wikitext markup and encyclopedic tone.',
+          steps: [
+            'Log in to platform.openai.com/api-keys.',
+            'Click "+ Create new secret key", provide a label (e.g. "Source Translation"), and copy your key.',
+            'Ensure your account has a payment method or credit balance under Settings → Billing.',
+            'Paste your secret key (starts with "sk-...") into the field below.',
+          ],
+          note: 'Tip: Use "gpt-4o-mini" for fast, affordable translations or "gpt-4o" for maximum nuance.',
+          link: 'https://platform.openai.com/api-keys',
+          linkText: 'Get OpenAI Secret Key',
+        };
+      }
+      if (this.translationService === 'custom_openai') {
+        const presets = {
+          groq: {
+            title: 'Groq Cloud (Fast & Free)',
+            badge: '⚡ Ultra-Fast Free Tier',
+            badgeColor: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+            summary: 'Extremely fast inference powered by LPU hardware with generous free daily token allowances.',
+            steps: [
+              'Create a free account at console.groq.com.',
+              'Go to API Keys → Click "Create API Key" (starts with "gsk_...").',
+              'Paste the key below. Endpoint & model are pre-filled automatically!',
+            ],
+            note: 'Pre-filled model: llama-3.3-70b-versatile (excellent for multilinguality).',
+            link: 'https://console.groq.com/keys',
+            linkText: 'Get Free Groq API Key',
+          },
+          deepseek: {
+            title: 'DeepSeek AI',
+            badge: '💰 Cost-Effective & Accurate',
+            badgeColor: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+            summary: 'High-capability reasoning and translation model with very low per-token pricing.',
+            steps: [
+              'Sign in to platform.deepseek.com.',
+              'Go to API Keys → Click "Create API Key" and copy your key.',
+              'Ensure a small prepaid balance ($2+) is active in your DeepSeek account.',
+            ],
+            note: 'Pre-filled model: deepseek-chat.',
+            link: 'https://platform.deepseek.com/api_keys',
+            linkText: 'Get DeepSeek API Key',
+          },
+          openrouter: {
+            title: 'OpenRouter (100+ Models)',
+            badge: '🌐 Multi-Provider Gateway',
+            badgeColor: 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+            summary: 'Unified API allowing access to Claude, Gemini, Llama, and hundreds of other models.',
+            steps: [
+              'Create an account at openrouter.ai.',
+              'Go to Keys → Click "Create Key" (starts with "sk-or-...").',
+              'Set optional credit limit and paste your key below.',
+            ],
+            note: 'Works with google/gemini-2.0-flash-001, meta-llama/llama-3.3-70b-instruct, etc.',
+            link: 'https://openrouter.ai/keys',
+            linkText: 'Get OpenRouter Key',
+          },
+          ollama: {
+            title: 'Ollama (Local & Offline)',
+            badge: '🛡️ 100% Free & Private (No Key)',
+            badgeColor: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+            summary: 'Run open-source LLMs locally on your own computer with zero cloud transmission.',
+            steps: [
+              'Download and install Ollama from ollama.com.',
+              'Open your terminal and run: ollama run llama3.2 (or mistral / qwen2.5).',
+              'Keep Ollama running locally. No API key required!',
+            ],
+            note: 'Default local endpoint: http://localhost:11434/v1/chat/completions.',
+            link: 'https://ollama.com',
+            linkText: 'Download Ollama',
+          },
+        };
+        return presets[this.activeUniversalPreset] || presets.groq;
+      }
+      if (this.translationService === 'google') {
+        return {
+          title: 'Google Cloud Translation API',
+          badge: 'Free Tier: 500,000 chars/mo + $300 Credit',
+          badgeColor: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+          summary: 'Official Google Cloud Translation Basic (v2 REST API).',
+          steps: [
+            'Go to Google Cloud Console (console.cloud.google.com).',
+            'Select your project → APIs & Services → Enable "Cloud Translation API".',
+            'Go to Credentials → Click "+ Create Credentials" → "API key".',
+            'Copy the key and paste it below. (Optional: restrict key to Cloud Translation API).',
+          ],
+          link: 'https://console.cloud.google.com/apis/credentials',
+          linkText: 'Get Google Cloud API Key',
+        };
+      }
+      if (this.translationService === 'microsoft') {
+        return {
+          title: 'Microsoft Azure Translator',
+          badge: 'Free Tier (F0): 2,000,000 chars/mo',
+          badgeColor: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
+          summary: 'Azure AI Cognitive Services Translator with generous free tier allowance.',
+          steps: [
+            'Go to Azure Portal (portal.azure.com) and search for "Translator".',
+            'Click Create → Select Free tier "F0" (2 Million characters/month free).',
+            'Open your Translator resource → Click "Keys and Endpoint" in the left menu.',
+            'Copy "KEY 1" or "KEY 2". If your resource has a region (e.g. eastus), format key as "region:your_key" or paste the global key.',
+          ],
+          link: 'https://portal.azure.com/#blade/HubsExtension/BrowseResource/resourceType/Microsoft.CognitiveServices%2Faccounts',
+          linkText: 'Open Azure Translator Portal',
+        };
+      }
+      if (this.translationService === 'libretranslate') {
+        return {
+          title: 'LibreTranslate (Open Source)',
+          badge: 'Self-Hosted or Hosted API',
+          badgeColor: 'bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+          summary: '100% free and open-source self-hostable machine translation engine.',
+          steps: [
+            'For libretranslate.com: Obtain an API key from portal.libretranslate.com.',
+            'For self-hosted instance: Run docker run -ti -p 5000:5000 libretranslate/libretranslate and leave the API key blank.',
+          ],
+          link: 'https://portal.libretranslate.com',
+          linkText: 'Get LibreTranslate Key',
+        };
+      }
+      if (this.translationService === 'custom_rest') {
+        return {
+          title: 'Custom REST MT Endpoint',
+          badge: 'Custom Microservice',
+          badgeColor: 'bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300 border-slate-200 dark:border-zinc-700',
+          summary: 'Connect to any custom HTTP POST machine translation microservice.',
+          steps: [
+            'Enter your custom HTTP endpoint URL in the Endpoint field below.',
+            'If your endpoint requires authentication, enter your Bearer token or API key in the Auth key field.',
+          ],
+          note: 'Payload format sent: { "text": "...", "fromLanguage": "en", "toLanguage": "es" }',
+        };
+      }
+      return null;
+    },
     showApiKeyInput() {
       return ['google', 'microsoft', 'openai', 'deepl', 'custom_openai', 'libretranslate', 'custom_rest'].includes(this.translationService);
     },
@@ -963,6 +1285,7 @@ export default {
     serviceInput() { this.saveState(); },
     serviceEndpoint() { this.saveState(); },
     serviceModel() { this.saveState(); },
+    activeUniversalPreset() { this.saveState(); },
     paragraphs: {
       deep: true,
       handler() { this.saveState(); }
@@ -983,6 +1306,58 @@ export default {
       this.saveState();
     },
 
+    selectUniversalPreset(preset) {
+      this.activeUniversalPreset = preset;
+      if (preset === 'groq') {
+        this.serviceEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+        this.serviceModel = 'llama-3.3-70b-versatile';
+      } else if (preset === 'deepseek') {
+        this.serviceEndpoint = 'https://api.deepseek.com/chat/completions';
+        this.serviceModel = 'deepseek-chat';
+      } else if (preset === 'openrouter') {
+        this.serviceEndpoint = 'https://api.openrouter.ai/api/v1/chat/completions';
+        this.serviceModel = 'google/gemini-2.0-flash-001';
+      } else if (preset === 'ollama') {
+        this.serviceEndpoint = 'http://localhost:11434/v1/chat/completions';
+        this.serviceModel = 'llama3.2';
+      }
+      this.saveState();
+    },
+
+    validateServiceConfiguration() {
+      if (this.translationService === 'openai' && !this.serviceInput.trim()) {
+        this.showToast('OpenAI API key is required. Opening configuration...', 'warning');
+        this.showProviderModal = true;
+        return false;
+      }
+      if (this.translationService === 'deepl' && !this.serviceInput.trim()) {
+        this.showToast('DeepL API key is required. Opening configuration...', 'warning');
+        this.showProviderModal = true;
+        return false;
+      }
+      if (this.translationService === 'google' && !this.serviceInput.trim()) {
+        this.showToast('Google Cloud API key is required. Opening configuration...', 'warning');
+        this.showProviderModal = true;
+        return false;
+      }
+      if (this.translationService === 'microsoft' && !this.serviceInput.trim()) {
+        this.showToast('Microsoft Azure Translator key is required. Opening configuration...', 'warning');
+        this.showProviderModal = true;
+        return false;
+      }
+      if (this.translationService === 'custom_rest' && !this.serviceEndpoint.trim()) {
+        this.showToast('Custom REST MT Endpoint URL is required. Opening configuration...', 'warning');
+        this.showProviderModal = true;
+        return false;
+      }
+      if (this.translationService === 'custom_openai' && !this.serviceEndpoint.trim()) {
+        this.showToast('Universal AI Endpoint URL is required. Opening configuration...', 'warning');
+        this.showProviderModal = true;
+        return false;
+      }
+      return true;
+    },
+
     swapLanguages() {
       const temp = this.fromLanguage;
       this.fromLanguage = this.toLanguage || 'en';
@@ -1001,6 +1376,9 @@ export default {
       }
       if (this.fromLanguage === this.toLanguage) {
         this.showToast(this.$t('warnings.sameLanguage'), 'warning');
+        return;
+      }
+      if (!this.validateServiceConfiguration()) {
         return;
       }
       const pendingIndices = this.paragraphs
@@ -1084,6 +1462,7 @@ export default {
         serviceInput: this.serviceInput,
         serviceEndpoint: this.serviceEndpoint,
         serviceModel: this.serviceModel,
+        activeUniversalPreset: this.activeUniversalPreset,
         missingLinkStrategy: this.missingLinkStrategy,
         paragraphs: this.paragraphs,
         rawWikitext: this.rawWikitext,
@@ -1111,6 +1490,7 @@ export default {
           if (parsed.serviceInput) this.serviceInput = parsed.serviceInput;
           if (parsed.serviceEndpoint) this.serviceEndpoint = parsed.serviceEndpoint;
           if (parsed.serviceModel) this.serviceModel = parsed.serviceModel;
+          if (parsed.activeUniversalPreset) this.activeUniversalPreset = parsed.activeUniversalPreset;
           if (parsed.missingLinkStrategy) this.missingLinkStrategy = parsed.missingLinkStrategy;
           if (parsed.paragraphs) this.paragraphs = parsed.paragraphs;
           if (parsed.rawWikitext) this.rawWikitext = parsed.rawWikitext;
@@ -1305,12 +1685,7 @@ export default {
       }
       this.toLanguageError = false;
 
-      if (this.translationService === 'openai' && !this.serviceInput.trim()) {
-        this.showToast('OpenAI API key is required', 'warning');
-        return;
-      }
-      if (this.translationService === 'deepl' && !this.serviceInput.trim()) {
-        this.showToast('DeepL API key is required', 'warning');
+      if (!this.validateServiceConfiguration()) {
         return;
       }
 
@@ -1384,12 +1759,7 @@ export default {
       }
       if (!this.wikitextInput.trim()) return;
 
-      if (this.translationService === 'openai' && !this.serviceInput.trim()) {
-        this.showToast('OpenAI API key is required', 'warning');
-        return;
-      }
-      if (this.translationService === 'deepl' && !this.serviceInput.trim()) {
-        this.showToast('DeepL API key is required', 'warning');
+      if (!this.validateServiceConfiguration()) {
         return;
       }
 
@@ -1427,12 +1797,7 @@ export default {
       }
       if (!this.templateInput.trim()) return;
 
-      if (this.translationService === 'openai' && !this.serviceInput.trim()) {
-        this.showToast('OpenAI API key is required', 'warning');
-        return;
-      }
-      if (this.translationService === 'deepl' && !this.serviceInput.trim()) {
-        this.showToast('DeepL API key is required', 'warning');
+      if (!this.validateServiceConfiguration()) {
         return;
       }
 
