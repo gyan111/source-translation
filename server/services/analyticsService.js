@@ -42,7 +42,7 @@ export const analyticsService = {
       mtEngine: mtEngine || 'google',
       targetNamespace,
       revisionId: revisionId ? parseInt(revisionId, 10) : null,
-      metadata: metadata ? JSON.stringify(metadata) : null,
+      metadata: metadata ? (typeof metadata === 'object' ? JSON.stringify(metadata) : metadata) : null,
       createdAt: new Date(),
     };
 
@@ -89,12 +89,36 @@ export const analyticsService = {
    */
   async getStatsSummary() {
     if (!isDatabaseConnected()) {
-      // Return aggregated in-memory metrics
+      // Aggregate in-memory metrics
       const totalEvents = inMemoryEvents.length;
       const publishes = inMemoryEvents.filter(e => e.eventType === 'publish').length;
       const translates = inMemoryEvents.filter(e => e.eventType === 'translate').length;
       const exportsAndCopies = inMemoryEvents.filter(e => e.eventType === 'copy' || e.eventType === 'export').length;
-      const uniqueUsers = new Set(inMemoryEvents.map(e => e.wikiUser).filter(u => u !== 'anonymous')).size;
+      const namedUsers = inMemoryEvents.filter(e => e.wikiUser && e.wikiUser !== 'anonymous');
+      const uniqueUsers = new Set(namedUsers.map(e => e.wikiUser)).size;
+
+      // Group in-memory top contributors
+      const userMap = {};
+      namedUsers.forEach(e => {
+        if (!userMap[e.wikiUser]) {
+          userMap[e.wikiUser] = {
+            wikiUser: e.wikiUser,
+            publishes: 0,
+            translates: 0,
+            exportsAndCopies: 0,
+            totalWords: 0,
+            lastActive: e.createdAt,
+          };
+        }
+        if (e.eventType === 'publish') userMap[e.wikiUser].publishes++;
+        else if (e.eventType === 'translate') userMap[e.wikiUser].translates++;
+        else if (e.eventType === 'copy' || e.eventType === 'export') userMap[e.wikiUser].exportsAndCopies++;
+        userMap[e.wikiUser].totalWords += (e.wordCount || 0);
+      });
+
+      const topContributors = Object.values(userMap)
+        .sort((a, b) => (b.publishes * 10 + b.translates) - (a.publishes * 10 + a.translates))
+        .slice(0, 10);
 
       return {
         databaseConnected: false,
@@ -107,6 +131,7 @@ export const analyticsService = {
         },
         languageDistribution: [],
         engineDistribution: [],
+        topContributors,
         dailyTrend: [],
       };
     }
@@ -124,7 +149,7 @@ export const analyticsService = {
         typeMap[row.event_type] = Number(row.count);
       });
 
-      // 2. Unique editors & articles
+      // 2. Unique editors & volume
       const [distinctStats] = await query(`
         SELECT 
           COUNT(DISTINCT CASE WHEN wiki_user != 'anonymous' THEN wiki_user END) as unique_users,
@@ -134,7 +159,32 @@ export const analyticsService = {
         FROM translation_events
       `);
 
-      // 3. Target Language breakdown
+      // 3. Top Contributors Leaderboard
+      const topContributorsRows = await query(`
+        SELECT 
+          wiki_user,
+          COUNT(CASE WHEN event_type = 'publish' THEN 1 END) as publishes,
+          COUNT(CASE WHEN event_type = 'translate' THEN 1 END) as translates,
+          COUNT(CASE WHEN event_type IN ('copy', 'export') THEN 1 END) as exports_and_copies,
+          COALESCE(SUM(word_count), 0) as total_words,
+          MAX(created_at) as last_active
+        FROM translation_events
+        WHERE wiki_user IS NOT NULL AND wiki_user != 'anonymous' AND wiki_user != ''
+        GROUP BY wiki_user
+        ORDER BY publishes DESC, total_words DESC
+        LIMIT 15
+      `);
+
+      const topContributors = topContributorsRows.map(r => ({
+        wikiUser: r.wiki_user,
+        publishes: Number(r.publishes || 0),
+        translates: Number(r.translates || 0),
+        exportsAndCopies: Number(r.exports_and_copies || 0),
+        totalWords: Number(r.total_words || 0),
+        lastActive: r.last_active,
+      }));
+
+      // 4. Target Language breakdown
       const languageDistribution = await query(`
         SELECT target_lang, COUNT(*) as count 
         FROM translation_events 
@@ -143,7 +193,7 @@ export const analyticsService = {
         LIMIT 10
       `);
 
-      // 4. MT Engine breakdown
+      // 5. MT Engine breakdown
       const engineDistribution = await query(`
         SELECT mt_engine, COUNT(*) as count 
         FROM translation_events 
@@ -152,7 +202,7 @@ export const analyticsService = {
         ORDER BY count DESC
       `);
 
-      // 5. Target Namespace breakdown (for publishes)
+      // 6. Target Namespace breakdown (for publishes)
       const namespaceDistribution = await query(`
         SELECT COALESCE(target_namespace, 'unknown') as namespace, COUNT(*) as count
         FROM translation_events
@@ -160,7 +210,7 @@ export const analyticsService = {
         GROUP BY namespace
       `);
 
-      // 6. 30-day Daily Activity Trend
+      // 7. 30-day Daily Activity Trend
       const dailyTrend = await query(`
         SELECT 
           DATE(created_at) as date,
@@ -187,6 +237,7 @@ export const analyticsService = {
           totalWords: Number(distinctStats?.total_words || 0),
           totalChars: Number(distinctStats?.total_chars || 0),
         },
+        topContributors,
         languageDistribution: languageDistribution.map(r => ({ language: r.target_lang, count: Number(r.count) })),
         engineDistribution: engineDistribution.map(r => ({ engine: r.mt_engine, count: Number(r.count) })),
         namespaceDistribution: namespaceDistribution.map(r => ({ namespace: r.namespace, count: Number(r.count) })),
@@ -198,6 +249,7 @@ export const analyticsService = {
         databaseConnected: false,
         error: err.message,
         totals: {},
+        topContributors: [],
         languageDistribution: [],
         engineDistribution: [],
         dailyTrend: [],
@@ -206,24 +258,37 @@ export const analyticsService = {
   },
 
   /**
-   * Get recent event stream.
+   * Get recent event stream with optional user filtering.
    */
-  async getRecentEvents(limit = 50) {
+  async getRecentEvents(limit = 60, userFilter = null) {
     if (!isDatabaseConnected()) {
-      return inMemoryEvents.slice(0, limit);
+      let list = inMemoryEvents;
+      if (userFilter) {
+        list = list.filter(e => e.wikiUser && e.wikiUser.toLowerCase() === userFilter.toLowerCase());
+      }
+      return list.slice(0, limit);
     }
 
     try {
-      const rows = await query(`
+      let sql = `
         SELECT 
           id, session_id, wiki_user, event_type, 
           source_lang, target_lang, source_title, target_title, 
           word_count, char_count, section_count, mt_engine, 
           target_namespace, revision_id, metadata, created_at
         FROM translation_events 
-        ORDER BY created_at DESC 
-        LIMIT ?
-      `, [limit]);
+      `;
+      const params = [];
+
+      if (userFilter) {
+        sql += ` WHERE wiki_user = ? `;
+        params.push(userFilter);
+      }
+
+      sql += ` ORDER BY created_at DESC LIMIT ? `;
+      params.push(limit);
+
+      const rows = await query(sql, params);
 
       return rows.map(r => ({
         id: r.id,

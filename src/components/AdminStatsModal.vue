@@ -1,18 +1,18 @@
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" @click.self="close">
-    <div class="bg-gray-900 border border-gray-700/80 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden text-gray-100 animate-scale-up">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in" @click.self="close">
+    <div class="bg-gray-900 border border-gray-700/80 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden text-gray-100 animate-scale-up">
       
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-900/90 sticky top-0 z-10">
+      <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-900/95 sticky top-0 z-10">
         <div class="flex items-center space-x-3">
-          <div class="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
-            <span class="material-icons text-2xl">analytics</span>
+          <div class="p-2.5 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-xl text-indigo-400">
+            <span class="material-icons text-2xl">leaderboard</span>
           </div>
           <div>
             <h2 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-purple-200 to-pink-300">
-              Tool Usage & Activity Analytics
+              Tool Usage & Contributor Analytics
             </h2>
-            <p class="text-xs text-gray-400">Real-time MariaDB telemetry & translation tracking dashboard (Admin Only)</p>
+            <p class="text-xs text-gray-400">Telemetry, editor leaderboard, conversion rates & translation activity (Admin)</p>
           </div>
         </div>
 
@@ -20,7 +20,7 @@
           <button 
             @click="fetchStats" 
             :disabled="loading"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors flex items-center space-x-1 border border-gray-700"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors flex items-center space-x-1 border border-gray-700 cursor-pointer"
             title="Refresh statistics"
           >
             <span class="material-icons text-sm" :class="{ 'animate-spin': loading }">refresh</span>
@@ -28,7 +28,7 @@
           </button>
           <button 
             @click="close" 
-            class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
           >
             <span class="material-icons text-lg">close</span>
           </button>
@@ -39,9 +39,9 @@
       <div class="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
         
         <!-- Loading State -->
-        <div v-if="loading && !stats" class="py-16 text-center text-gray-400 flex flex-col items-center justify-center space-y-3">
+        <div v-if="loading && !stats" class="py-20 text-center text-gray-400 flex flex-col items-center justify-center space-y-3">
           <span class="material-icons text-4xl animate-spin text-indigo-400">sync</span>
-          <p class="text-sm">Fetching analytics data from database...</p>
+          <p class="text-sm">Fetching analytics and contributor records...</p>
         </div>
 
         <!-- Error State -->
@@ -59,7 +59,7 @@
           <div v-if="!stats.summary?.databaseConnected" class="px-4 py-2.5 bg-amber-950/30 border border-amber-800/40 rounded-xl text-amber-300/90 text-xs flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <span class="material-icons text-sm text-amber-400">info</span>
-              <span>Running in memory fallback mode. Connect MySQL/MariaDB for persistent history across restarts.</span>
+              <span>Running in memory fallback mode. Configure MariaDB envvars to persist data across tool restarts.</span>
             </div>
             <span class="px-2 py-0.5 bg-amber-900/60 rounded text-[10px] uppercase tracking-wider font-semibold">Memory Mode</span>
           </div>
@@ -91,7 +91,9 @@
                 <div class="text-2xl font-black text-emerald-300 tracking-tight">
                   {{ formatNumber(stats.summary?.totals?.publishes || 0) }}
                 </div>
-                <div class="text-[11px] text-emerald-400/80 mt-0.5">Direct on-wiki edits</div>
+                <div class="text-[11px] text-emerald-400/80 mt-0.5">
+                  {{ calculatePercentage(stats.summary?.totals?.publishes, stats.summary?.totals?.translates) }}% publish rate
+                </div>
               </div>
             </div>
 
@@ -103,30 +105,82 @@
               </div>
               <div class="mt-3">
                 <div class="text-2xl font-black text-blue-300 tracking-tight">
-                  {{ formatNumber(stats.summary?.totals?.exportsAndCopies || (stats.summary?.totals?.copies || 0) + (stats.summary?.totals?.exports || 0)) }}
+                  {{ formatNumber(stats.summary?.totals?.exportsAndCopies || 0) }}
                 </div>
-                <div class="text-[11px] text-blue-400/80 mt-0.5">Wikitext exports & clips</div>
+                <div class="text-[11px] text-blue-400/80 mt-0.5">Wikitext exported or copied</div>
               </div>
             </div>
 
             <!-- Card 4: Unique Editors -->
             <div class="p-4 bg-gradient-to-br from-purple-950/30 to-gray-850/90 border border-purple-800/40 rounded-xl flex flex-col justify-between relative overflow-hidden">
               <div class="flex items-center justify-between text-purple-400">
-                <span class="text-xs font-semibold uppercase tracking-wider">Editors</span>
+                <span class="text-xs font-semibold uppercase tracking-wider">Active Editors</span>
                 <span class="material-icons text-purple-400 text-lg">people</span>
               </div>
               <div class="mt-3">
                 <div class="text-2xl font-black text-purple-300 tracking-tight">
-                  {{ formatNumber(stats.summary?.totals?.uniqueUsers || 0) }}
+                  {{ formatNumber(stats.summary?.totals?.uniqueUsers || stats.summary?.topContributors?.length || 0) }}
                 </div>
-                <div class="text-[11px] text-purple-400/80 mt-0.5">Authenticated users</div>
+                <div class="text-[11px] text-purple-400/80 mt-0.5">Logged-in Wikimedia users</div>
               </div>
             </div>
 
           </div>
 
-          <!-- Mid Section: Language Distribution & MT Engines -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- Section: Top Contributors Leaderboard -->
+          <div class="p-5 bg-gray-850/90 border border-gray-700/70 rounded-xl space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="material-icons text-amber-400 text-lg">military_tech</span>
+                <h3 class="text-sm font-bold text-gray-200">Top Contributors Leaderboard</h3>
+              </div>
+              <span class="text-xs text-gray-400">Click any user to filter their activity</span>
+            </div>
+
+            <div v-if="!stats.summary?.topContributors?.length" class="text-xs text-gray-500 py-6 text-center">
+              No authenticated user contributions recorded yet. (Guest edits are marked as Anonymous).
+            </div>
+
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div 
+                v-for="(editor, index) in stats.summary.topContributors" 
+                :key="editor.wikiUser"
+                @click="filterByUser(editor.wikiUser)"
+                class="p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between"
+                :class="selectedUser === editor.wikiUser ? 'bg-indigo-950/50 border-indigo-500 shadow-md ring-1 ring-indigo-500' : 'bg-gray-800/70 hover:bg-gray-800 border-gray-750 hover:border-gray-600'"
+              >
+                <div class="flex items-center space-x-3 truncate">
+                  <!-- Rank Badge -->
+                  <div 
+                    class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+                    :class="[
+                      index === 0 ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40' :
+                      index === 1 ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40' :
+                      index === 2 ? 'bg-amber-600/20 text-amber-500 border border-amber-600/40' :
+                      'bg-gray-750 text-gray-400'
+                    ]"
+                  >
+                    {{ index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}` }}
+                  </div>
+                  <div class="truncate">
+                    <div class="text-xs font-bold text-indigo-300 truncate hover:underline">
+                      {{ editor.wikiUser }}
+                    </div>
+                    <div class="text-[10px] text-gray-400 flex items-center space-x-2 mt-0.5">
+                      <span>{{ editor.publishes }} published</span>
+                      <span>•</span>
+                      <span>{{ formatNumber(editor.totalWords) }} words</span>
+                    </div>
+                  </div>
+                </div>
+
+                <span class="material-icons text-gray-500 text-sm">arrow_forward</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Languages, Engines, & Efficiency Insights -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
             
             <!-- Language Distribution -->
             <div class="p-5 bg-gray-850/80 border border-gray-700/60 rounded-xl">
@@ -153,48 +207,84 @@
               </div>
             </div>
 
-            <!-- MT Engines & Destinations -->
-            <div class="p-5 bg-gray-850/80 border border-gray-700/60 rounded-xl flex flex-col justify-between">
-              <div>
-                <h3 class="text-sm font-semibold text-gray-200 flex items-center space-x-2 mb-4">
-                  <span class="material-icons text-base text-pink-400">smart_toy</span>
-                  <span>Translation Engines Used</span>
-                </h3>
-                <div v-if="!stats.summary?.engineDistribution?.length" class="text-xs text-gray-500 py-4 text-center">
-                  No engine data recorded yet.
+            <!-- MT Engines -->
+            <div class="p-5 bg-gray-850/80 border border-gray-700/60 rounded-xl">
+              <h3 class="text-sm font-semibold text-gray-200 flex items-center space-x-2 mb-4">
+                <span class="material-icons text-base text-pink-400">smart_toy</span>
+                <span>Translation Engines</span>
+              </h3>
+              <div v-if="!stats.summary?.engineDistribution?.length" class="text-xs text-gray-500 py-4 text-center">
+                No engine data recorded yet.
+              </div>
+              <div v-else class="space-y-3">
+                <div v-for="item in stats.summary.engineDistribution" :key="item.engine" class="space-y-1">
+                  <div class="flex justify-between text-xs font-medium">
+                    <span class="text-gray-300 capitalize">{{ item.engine || 'Google Translate' }}</span>
+                    <span class="text-gray-400">{{ item.count }} uses</span>
+                  </div>
+                  <div class="w-full bg-gray-750 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      class="bg-gradient-to-r from-pink-500 to-amber-500 h-1.5 rounded-full transition-all duration-500" 
+                      :style="{ width: `${calculatePercentage(item.count, stats.summary.totals?.totalEvents)}%` }"
+                    ></div>
+                  </div>
                 </div>
-                <div v-else class="space-y-3">
-                  <div v-for="item in stats.summary.engineDistribution" :key="item.engine" class="space-y-1">
-                    <div class="flex justify-between text-xs font-medium">
-                      <span class="text-gray-300 capitalize">{{ item.engine || 'Google Translate' }}</span>
-                      <span class="text-gray-400">{{ item.count }} uses</span>
-                    </div>
-                    <div class="w-full bg-gray-750 rounded-full h-1.5 overflow-hidden">
-                      <div 
-                        class="bg-gradient-to-r from-pink-500 to-amber-500 h-1.5 rounded-full transition-all duration-500" 
-                        :style="{ width: `${calculatePercentage(item.count, stats.summary.totals?.totalEvents)}%` }"
-                      ></div>
-                    </div>
+              </div>
+            </div>
+
+            <!-- Efficiency & Volume Metrics -->
+            <div class="p-5 bg-gray-850/80 border border-gray-700/60 rounded-xl flex flex-col justify-between space-y-4">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-200 flex items-center space-x-2 mb-3">
+                  <span class="material-icons text-base text-emerald-400">insights</span>
+                  <span>Volume & Conversion</span>
+                </h3>
+                
+                <div class="space-y-3 text-xs">
+                  <div class="flex justify-between py-1.5 border-b border-gray-750">
+                    <span class="text-gray-400">Total Words Translated:</span>
+                    <strong class="text-gray-200 font-mono">{{ formatNumber(stats.summary?.totals?.totalWords || 0) }}</strong>
+                  </div>
+                  <div class="flex justify-between py-1.5 border-b border-gray-750">
+                    <span class="text-gray-400">Unique Articles:</span>
+                    <strong class="text-gray-200 font-mono">{{ formatNumber(stats.summary?.totals?.uniqueArticles || 0) }}</strong>
+                  </div>
+                  <div class="flex justify-between py-1.5 border-b border-gray-750">
+                    <span class="text-gray-400">Avg Words / Article:</span>
+                    <strong class="text-gray-200 font-mono">
+                      {{ stats.summary?.totals?.uniqueArticles ? Math.round((stats.summary?.totals?.totalWords || 0) / stats.summary.totals.uniqueArticles) : 0 }}
+                    </strong>
+                  </div>
+                  <div class="flex justify-between py-1.5">
+                    <span class="text-gray-400">Mainspace vs Sandbox:</span>
+                    <strong class="text-emerald-400 font-mono">
+                      {{ stats.summary?.namespaceDistribution?.find(n => n.namespace === 'mainspace')?.count || 0 }} live / {{ stats.summary?.namespaceDistribution?.find(n => n.namespace === 'sandbox')?.count || 0 }} draft
+                    </strong>
                   </div>
                 </div>
               </div>
 
-              <!-- Conversion / Destination Summary -->
-              <div class="mt-5 pt-4 border-t border-gray-750/80 flex items-center justify-between text-xs text-gray-400">
-                <span>Words Translated: <strong class="text-gray-200 font-mono">{{ formatNumber(stats.summary?.totals?.totalWords || 0) }}</strong></span>
-                <span>Articles Touched: <strong class="text-gray-200 font-mono">{{ formatNumber(stats.summary?.totals?.uniqueArticles || 0) }}</strong></span>
+              <div class="p-2.5 bg-gray-800 rounded-lg text-[11px] text-gray-400 flex items-center space-x-2">
+                <span class="material-icons text-indigo-400 text-sm">verified_user</span>
+                <span>All edits link to verified Wikimedia accounts</span>
               </div>
             </div>
 
           </div>
 
-          <!-- Bottom Section: Recent Activity Feed -->
+          <!-- Section: Activity Feed with User Filter -->
           <div class="p-5 bg-gray-850/80 border border-gray-700/60 rounded-xl space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 class="text-sm font-semibold text-gray-200 flex items-center space-x-2">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center space-x-2">
                 <span class="material-icons text-base text-emerald-400">history</span>
-                <span>Recent Translation & Publish Activity</span>
-              </h3>
+                <h3 class="text-sm font-semibold text-gray-200">Recent Translation & Publish Activity</h3>
+                
+                <!-- Active User Filter Tag -->
+                <div v-if="selectedUser" class="ml-2 inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-medium">
+                  <span>User: {{ selectedUser }}</span>
+                  <button @click="clearUserFilter" class="hover:text-white ml-1 cursor-pointer">✕</button>
+                </div>
+              </div>
               
               <!-- Filter Tabs -->
               <div class="flex items-center space-x-1 bg-gray-800 p-1 rounded-lg text-[11px]">
@@ -202,7 +292,7 @@
                   v-for="filter in ['all', 'publish', 'translate', 'export']" 
                   :key="filter"
                   @click="activeFilter = filter"
-                  class="px-2.5 py-1 rounded capitalize transition-colors"
+                  class="px-2.5 py-1 rounded capitalize transition-colors cursor-pointer"
                   :class="activeFilter === filter ? 'bg-indigo-600 text-white font-medium shadow-sm' : 'text-gray-400 hover:text-gray-200'"
                 >
                   {{ filter === 'export' ? 'Exports / Copies' : filter }}
@@ -234,8 +324,14 @@
                       {{ formatTime(event.createdAt) }}
                     </td>
                     <td class="py-2.5 px-3 font-medium whitespace-nowrap">
-                      <span v-if="event.wikiUser && event.wikiUser !== 'anonymous'" class="text-indigo-300 hover:underline cursor-pointer">
-                        {{ event.wikiUser }}
+                      <span 
+                        v-if="event.wikiUser && event.wikiUser !== 'anonymous'" 
+                        @click="filterByUser(event.wikiUser)"
+                        class="text-indigo-300 hover:text-indigo-200 hover:underline cursor-pointer flex items-center space-x-1"
+                        title="Filter activity by this editor"
+                      >
+                        <span>{{ event.wikiUser }}</span>
+                        <span class="material-icons text-[10px] opacity-60">filter_alt</span>
                       </span>
                       <span v-else class="text-gray-500 italic">Anonymous</span>
                     </td>
@@ -282,12 +378,12 @@
       </div>
 
       <!-- Footer -->
-      <div class="px-6 py-3 border-t border-gray-800 bg-gray-900/90 flex items-center justify-between text-xs text-gray-500">
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-900/95 flex items-center justify-between text-xs text-gray-500">
         <div class="flex items-center space-x-2">
           <span class="inline-block w-2 h-2 rounded-full" :class="stats?.summary?.databaseConnected ? 'bg-emerald-500' : 'bg-amber-500'"></span>
-          <span>{{ stats?.summary?.databaseConnected ? 'MariaDB Live' : 'In-Memory Telemetry' }}</span>
+          <span>{{ stats?.summary?.databaseConnected ? 'MariaDB Telemetry Connected' : 'In-Memory Telemetry' }}</span>
         </div>
-        <button @click="close" class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors font-medium">
+        <button @click="close" class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors font-medium cursor-pointer">
           Close
         </button>
       </div>
@@ -312,12 +408,16 @@ const stats = ref(null);
 const loading = ref(false);
 const error = ref(null);
 const activeFilter = ref('all');
+const selectedUser = ref(null);
 
 const fetchStats = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const res = await fetch('/api/admin/stats');
+    const url = selectedUser.value 
+      ? `/api/admin/stats?user=${encodeURIComponent(selectedUser.value)}`
+      : '/api/admin/stats';
+    const res = await fetch(url);
     if (!res.ok) {
       if (res.status === 403) {
         throw new Error('You do not have administrative privileges to view analytics.');
@@ -339,6 +439,17 @@ watch(() => props.isOpen, (open) => {
   }
 });
 
+const filterByUser = (username) => {
+  if (!username || username === 'anonymous') return;
+  selectedUser.value = username;
+  fetchStats();
+};
+
+const clearUserFilter = () => {
+  selectedUser.value = null;
+  fetchStats();
+};
+
 const close = () => {
   emit('close');
 };
@@ -349,7 +460,7 @@ const formatNumber = (num) => {
 };
 
 const calculatePercentage = (count, total) => {
-  if (!total || total === 0) return 0;
+  if (!total || total === 0 || !count) return 0;
   return Math.min(100, Math.round((count / total) * 100));
 };
 
@@ -358,7 +469,6 @@ const formatTime = (isoString) => {
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return '—';
   
-  // Format as short date and time e.g. "Aug 25, 14:32"
   return d.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -384,7 +494,10 @@ const getActionBadgeClass = (eventType) => {
 };
 
 const filteredEvents = computed(() => {
-  const events = stats.value?.recentEvents || [];
+  let events = stats.value?.recentEvents || [];
+  if (selectedUser.value) {
+    events = events.filter(e => e.wikiUser && e.wikiUser.toLowerCase() === selectedUser.value.toLowerCase());
+  }
   if (activeFilter.value === 'all') return events;
   if (activeFilter.value === 'export') {
     return events.filter(e => e.eventType === 'copy' || e.eventType === 'export');

@@ -75,11 +75,17 @@ describe('Analytics Service Telemetry', () => {
     const summary = await analyticsService.getStatsSummary();
     expect(summary).toBeDefined();
     expect(summary.totals).toBeDefined();
+    expect(summary.topContributors).toBeDefined();
+    expect(Array.isArray(summary.topContributors)).toBe(true);
 
     const recent = await analyticsService.getRecentEvents(10);
     expect(recent.length).toBeGreaterThanOrEqual(3);
     const publishEvent = recent.find(e => e.eventType === 'publish');
     expect(publishEvent).toBeDefined();
     expect(publishEvent.revisionId).toBe(987654321);
+
+    // Test user filter
+    const userEvents = await analyticsService.getRecentEvents(10, 'Jnanaranjan_sahu');
+    expect(userEvents.every(e => e.wikiUser === 'Jnanaranjan_sahu')).toBe(true);
   });
 });

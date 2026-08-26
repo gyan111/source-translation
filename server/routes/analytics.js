@@ -61,9 +61,10 @@ router.get('/admin/stats', async (req, res) => {
   }
 
   try {
+    const userFilter = req.query.user ? req.query.user.trim() : null;
     const [summary, recentEvents] = await Promise.all([
       analyticsService.getStatsSummary(),
-      analyticsService.getRecentEvents(50),
+      analyticsService.getRecentEvents(100, userFilter),
     ]);
 
     res.json({
