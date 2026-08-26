@@ -41,14 +41,19 @@ app.use(bodyParser.json({ limit: '5mb' }));
 // Healthcheck for Toolforge Kubernetes ingress
 app.get('/healthz', (req, res) => res.status(200).send('OK'));
 
+// Trust proxy for Toolforge Kubernetes / reverse proxy HTTPS forwarding
+app.set('trust proxy', 1);
+
 // Session middleware for OAuth
 app.use(session({
   secret: process.env.SESSION_SECRET || 'source-translation-secret-key',
   resave: false,
   saveUninitialized: false,
+  rolling: true, // Reset session expiration timer on each request
   cookie: {
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
 }));
 
