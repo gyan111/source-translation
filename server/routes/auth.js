@@ -102,6 +102,7 @@ router.post('/logout', (req, res) => {
 });
 
 import { isVerifiedUser } from '../config/verifiedUsers.js';
+import { isAdminUser } from '../config/adminUsers.js';
 
 // Get current user
 router.get('/user', (req, res) => {
@@ -111,6 +112,7 @@ router.get('/user', (req, res) => {
       username: username,
       id: req.session.user.id,
       canPublishMainspace: isVerifiedUser(username),
+      isAdmin: isAdminUser(username),
     });
   } else {
     res.json(null);

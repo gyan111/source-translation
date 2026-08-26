@@ -1,5 +1,6 @@
 import express from 'express';
 import { isVerifiedUser } from '../config/verifiedUsers.js';
+import { analyticsService } from '../services/analyticsService.js';
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const { text, language, title, sourceLanguage, sourceTitle } = req.body;
+  const { text, language, title, sourceLanguage, sourceTitle, mtEngine, sessionId } = req.body;
 
   if (!text || !language || !title) {
     return res.status(400).json({
@@ -94,6 +95,34 @@ router.post('/', async (req, res) => {
         throw new Error('OAuth session expired. Please log out and log in again.');
       }
       throw new Error(errInfo);
+    }
+
+    // 4. Log publish analytics event
+    try {
+      const targetNamespace = title.startsWith('User:') ? 'sandbox' : (title.startsWith('Draft:') ? 'draft' : 'mainspace');
+      const wordCount = (text || '').trim().split(/\s+/).filter(Boolean).length;
+      const charCount = (text || '').length;
+
+      await analyticsService.logEvent({
+        sessionId,
+        wikiUser: username,
+        eventType: 'publish',
+        sourceLang: sourceLanguage || 'en',
+        targetLang: language,
+        sourceTitle: sourceTitle || title,
+        targetTitle: title,
+        wordCount,
+        charCount,
+        mtEngine: mtEngine || 'google',
+        targetNamespace,
+        revisionId: editData.edit?.newrevid || null,
+        metadata: {
+          result: editData.edit?.result,
+          pageId: editData.edit?.pageid,
+        },
+      });
+    } catch (analyticsErr) {
+      console.warn('[Analytics] Failed to record publish event:', analyticsErr.message);
     }
 
     res.json({ success: true, data: editData.edit });

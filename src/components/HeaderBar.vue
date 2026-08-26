@@ -38,6 +38,17 @@
           </span>
         </button>
 
+        <!-- Admin Analytics Button -->
+        <button
+          v-if="user && user.isAdmin"
+          @click="$emit('open-analytics')"
+          class="px-2.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+          title="Tool Usage & Analytics Dashboard"
+        >
+          <span class="material-icons-round text-sm">analytics</span>
+          <span class="hidden sm:inline">Analytics</span>
+        </button>
+
         <!-- Login / User -->
         <button
           v-if="!user"

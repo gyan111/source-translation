@@ -364,6 +364,10 @@ export default {
       type: Number,
       default: 0,
     },
+    mtEngine: {
+      type: String,
+      default: 'google',
+    },
   },
   data() {
     return {
@@ -507,6 +511,7 @@ export default {
           title: finalTitle,
           sourceLanguage: this.fromLanguage,
           sourceTitle: this.sourceTitle,
+          mtEngine: this.mtEngine || 'google',
         });
 
         if (response.data && response.data.success) {

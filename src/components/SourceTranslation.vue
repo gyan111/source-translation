@@ -808,6 +808,7 @@
       :totalSectionsCount="paragraphs.length"
       :isFullyReviewed="isFullyReviewed"
       :modificationPercent="totalModificationPercent"
+      :mtEngine="translationService"
       @close="showPublishModal = false"
       @published="handleArticlePublished"
     />
@@ -1299,6 +1300,33 @@ export default {
   },
 
   methods: {
+    trackAnalyticsEvent(eventType, extra = {}) {
+      try {
+        const text = this.fullTranslatedText || this.wikitextTranslated || this.templateTranslated || '';
+        const wordCount = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
+        const charCount = text.length;
+        const payload = {
+          eventType,
+          sourceLang: this.fromLanguage || 'en',
+          targetLang: this.toLanguage || 'or',
+          sourceTitle: this.articleInput || 'Direct Text / Document',
+          targetTitle: this.publishTitle || this.articleInput || null,
+          wordCount,
+          charCount,
+          sectionCount: this.paragraphs ? this.paragraphs.length : 0,
+          mtEngine: this.translationService || 'google',
+          ...extra,
+        };
+        fetch('/api/analytics/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+      } catch (e) {
+        // Silent fail for telemetry
+      }
+    },
+
     setMode(mode) {
       this.currentMode = mode;
       this.showWikitextBox = (mode === 'wikitext');
@@ -1436,6 +1464,7 @@ export default {
       this.isTranslatingAll = false;
       if (!this.translatingCancelRequested) {
         this.showToast('All pending sections translated!', 'success');
+        this.trackAnalyticsEvent('translate');
       }
     },
 
@@ -1622,6 +1651,7 @@ export default {
           this.rawWikitext = data.parse.wikitext['*'];
           this.splitIntoParagraphs(this.rawWikitext);
           if (this.toLanguage) this.checkArticleExists();
+          this.trackAnalyticsEvent('start');
         } else {
           this.showToast(this.$t('warnings.articleNotFound'), 'warning');
         }
@@ -1856,6 +1886,7 @@ export default {
       }
       navigator.clipboard.writeText(this.fullTranslatedText)
         .then(() => {
+          this.trackAnalyticsEvent('copy', { format: 'full_wikitext' });
           if (!this.isFullyReviewed) {
             this.showToast('Copied to clipboard! ⚠️ Please proofread unreviewed machine translation before publishing on Wikipedia.', 'warning');
           } else {
@@ -1866,12 +1897,18 @@ export default {
 
     copyWikitextResult() {
       navigator.clipboard.writeText(this.wikitextTranslated)
-        .then(() => this.showToast(this.$t('warnings.copied'), 'success'));
+        .then(() => {
+          this.trackAnalyticsEvent('copy', { format: 'raw_wikitext' });
+          this.showToast(this.$t('warnings.copied'), 'success');
+        });
     },
 
     copyTemplateResult() {
       navigator.clipboard.writeText(this.templateTranslated)
-        .then(() => this.showToast(this.$t('warnings.copied'), 'success'));
+        .then(() => {
+          this.trackAnalyticsEvent('copy', { format: 'template' });
+          this.showToast(this.$t('warnings.copied'), 'success');
+        });
     },
 
     openPublishModal() {
@@ -1896,6 +1933,7 @@ export default {
         this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
         return;
       }
+      this.trackAnalyticsEvent('export', { format: 'wiki_file' });
       const blob = new Blob([this.fullTranslatedText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

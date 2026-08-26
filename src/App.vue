@@ -1,10 +1,22 @@
 <template>
   <div :class="{ dark: isDark }" class="min-h-screen flex flex-col bg-surface-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 transition-colors duration-300">
-    <HeaderBar :isDark="isDark" :user="user" @toggle-dark-mode="toggleDarkMode" @update:user="user = $event" />
+    <HeaderBar 
+      :isDark="isDark" 
+      :user="user" 
+      @toggle-dark-mode="toggleDarkMode" 
+      @update:user="user = $event" 
+      @open-analytics="showAdminStats = true"
+    />
     <main class="flex-1 w-full">
       <SourceTranslation :user="user" />
     </main>
     <FooterBar />
+
+    <!-- Admin Analytics Modal -->
+    <AdminStatsModal 
+      :isOpen="showAdminStats" 
+      @close="showAdminStats = false" 
+    />
   </div>
 </template>
 
@@ -12,6 +24,7 @@
 import HeaderBar from './components/HeaderBar.vue';
 import SourceTranslation from './components/SourceTranslation.vue';
 import FooterBar from './components/FooterBar.vue';
+import AdminStatsModal from './components/AdminStatsModal.vue';
 import { isRtlLanguage } from './i18n.js';
 
 export default {
@@ -20,11 +33,13 @@ export default {
     HeaderBar,
     SourceTranslation,
     FooterBar,
+    AdminStatsModal,
   },
   data() {
     return {
       isDark: false,
       user: null,
+      showAdminStats: false,
     };
   },
   watch: {

@@ -8,6 +8,8 @@ import translateRoute from './routes/translate.js';
 import previewRoute from './routes/preview.js';
 import authRoute from './routes/auth.js';
 import publishRoute from './routes/publish.js';
+import analyticsRoute from './routes/analytics.js';
+import { initDatabase } from './config/database.js';
 
 // Auto-load .env file if present
 if (fs.existsSync('.env')) {
@@ -70,6 +72,8 @@ app.use('/translate', translateRoute);
 app.use('/preview', previewRoute);
 app.use('/auth', authRoute);
 app.use('/publish', publishRoute);
+app.use('/api/analytics', analyticsRoute);
+app.use('/api', analyticsRoute);
 
 // Direct /callback route alias for OAuth redirects configured with /callback
 app.get('/callback', (req, res) => {
@@ -91,6 +95,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Server listening on 0.0.0.0:${PORT}`));
+// Initialize database schema and start server
+initDatabase().finally(() => {
+  app.listen(PORT, '0.0.0.0', () => console.log(`Server listening on 0.0.0.0:${PORT}`));
+});
+
 
 
