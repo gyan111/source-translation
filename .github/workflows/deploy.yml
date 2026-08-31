@@ -75,6 +75,6 @@ jobs:
             sleep 5
             
             echo "Starting webservice with newly built container image..."
-            become source-translation toolforge webservice --mount=none buildservice start || become source-translation toolforge webservice buildservice start
+            become source-translation toolforge webservice buildservice restart --mount=all || become source-translation toolforge webservice buildservice start --mount=all
             echo "Source Translation deployment complete!"
           EOF
