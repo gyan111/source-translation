@@ -731,34 +731,57 @@
                 </div>
               </div>
 
-              <!-- API Key / Auth Token Input with Visibility Toggle -->
+              <!-- API Key / Auth Token Input with Visibility Toggle & Delete Action -->
               <div v-if="showApiKeyInput">
                 <div class="flex items-center justify-between mb-1">
                   <label class="field-label mb-0">API Key / Auth Token</label>
-                  <button
-                    type="button"
-                    @click="showApiKey = !showApiKey"
-                    class="text-[11px] text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center gap-1 transition-colors"
-                  >
-                    <span class="material-icons-round text-xs">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
-                    <span>{{ showApiKey ? 'Hide key' : 'Show key' }}</span>
-                  </button>
+                  <div class="flex items-center gap-3">
+                    <button
+                      v-if="serviceInput"
+                      type="button"
+                      @click="deleteCurrentApiKey"
+                      class="text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1 transition-colors"
+                      title="Delete saved API key from local storage"
+                    >
+                      <span class="material-icons-round text-xs">delete_outline</span>
+                      <span>Delete key</span>
+                    </button>
+                    <button
+                      type="button"
+                      @click="showApiKey = !showApiKey"
+                      class="text-[11px] text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center gap-1 transition-colors"
+                    >
+                      <span class="material-icons-round text-xs">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
+                      <span>{{ showApiKey ? 'Hide key' : 'Show key' }}</span>
+                    </button>
+                  </div>
                 </div>
                 <div class="relative">
                   <input
                     v-model="serviceInput"
                     :type="showApiKey ? 'text' : 'password'"
-                    class="input-field pr-9 font-mono text-xs"
+                    class="input-field pr-16 font-mono text-xs"
                     :placeholder="apiKeyPlaceholder"
                   />
-                  <button
-                    type="button"
-                    @click="showApiKey = !showApiKey"
-                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors"
-                    :title="showApiKey ? 'Hide key' : 'Show key'"
-                  >
-                    <span class="material-icons-round text-sm">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
-                  </button>
+                  <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      v-if="serviceInput"
+                      type="button"
+                      @click="deleteCurrentApiKey"
+                      class="text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-0.5 rounded"
+                      title="Delete key from local storage"
+                    >
+                      <span class="material-icons-round text-sm">clear</span>
+                    </button>
+                    <button
+                      type="button"
+                      @click="showApiKey = !showApiKey"
+                      class="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors p-0.5 rounded"
+                      :title="showApiKey ? 'Hide key' : 'Show key'"
+                    >
+                      <span class="material-icons-round text-sm">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -901,7 +924,7 @@ export default {
 
       // Translation service & options
       translationService: 'mint',
-      serviceInput: '',
+      serviceKeys: {},
       serviceEndpoint: '',
       serviceModel: '',
       activeUniversalPreset: 'groq', // 'groq' | 'deepseek' | 'openrouter' | 'ollama'
@@ -1326,6 +1349,18 @@ reviewedCount() {
       if (!this.translatedCount) return 0;
       return Math.round((this.reviewedCount / this.translatedCount) * 100);
     },
+    serviceInput: {
+      get() {
+        return (this.serviceKeys && this.serviceKeys[this.translationService]) || '';
+      },
+      set(val) {
+        this.serviceKeys = {
+          ...this.serviceKeys,
+          [this.translationService]: val,
+        };
+        this.saveState();
+      },
+    },
     isKeyRequiredAndMissing() {
       const needsKey = ['deepl', 'openai', 'microsoft'].includes(this.translationService);
       if (needsKey && !this.serviceInput?.trim()) return true;
@@ -1361,7 +1396,10 @@ reviewedCount() {
     fromLanguage() { this.saveState(); },
     articleInput() { this.saveState(); },
     translationService() { this.saveState(); },
-    serviceInput() { this.saveState(); },
+    serviceKeys: {
+      deep: true,
+      handler() { this.saveState(); },
+    },
     serviceEndpoint() { this.saveState(); },
     serviceModel() { this.saveState(); },
     activeUniversalPreset() { this.saveState(); },
@@ -1560,6 +1598,17 @@ reviewedCount() {
       this.showToast('Translation cancelled.', 'warning');
     },
 
+    deleteCurrentApiKey() {
+      const currentService = this.translationService;
+      const serviceName = this.availableServices.find(s => s.id === currentService)?.name || currentService;
+      this.serviceKeys = {
+        ...this.serviceKeys,
+        [currentService]: '',
+      };
+      this.saveState();
+      this.showToast(`Saved API key for ${serviceName} deleted from storage.`, 'info');
+    },
+
     saveState() {
       const state = {
         currentMode: this.currentMode,
@@ -1567,7 +1616,7 @@ reviewedCount() {
         toLanguage: this.toLanguage,
         articleInput: this.articleInput,
         translationService: this.translationService,
-        serviceInput: this.serviceInput,
+        serviceKeys: this.serviceKeys,
         serviceEndpoint: this.serviceEndpoint,
         serviceModel: this.serviceModel,
         activeUniversalPreset: this.activeUniversalPreset,
@@ -1595,7 +1644,13 @@ reviewedCount() {
           if (parsed.toLanguage) this.toLanguage = parsed.toLanguage;
           if (parsed.articleInput) this.articleInput = parsed.articleInput;
           if (parsed.translationService) this.translationService = parsed.translationService;
-          if (parsed.serviceInput) this.serviceInput = parsed.serviceInput;
+          if (parsed.serviceKeys && typeof parsed.serviceKeys === 'object') {
+            this.serviceKeys = parsed.serviceKeys;
+          } else if (parsed.serviceInput) {
+            this.serviceKeys = {
+              [parsed.translationService || 'deepl']: parsed.serviceInput,
+            };
+          }
           if (parsed.serviceEndpoint) this.serviceEndpoint = parsed.serviceEndpoint;
           if (parsed.serviceModel) this.serviceModel = parsed.serviceModel;
           if (parsed.activeUniversalPreset) this.activeUniversalPreset = parsed.activeUniversalPreset;
@@ -1624,7 +1679,7 @@ reviewedCount() {
       this.clearArticle();
       this.currentMode = 'article';
       this.translationService = 'mint';
-      this.serviceInput = '';
+      this.serviceKeys = {};
       this.serviceEndpoint = '';
       this.serviceModel = '';
       this.toLanguage = '';
