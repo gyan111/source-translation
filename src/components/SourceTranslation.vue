@@ -762,6 +762,11 @@
                     :type="showApiKey ? 'text' : 'password'"
                     class="input-field pr-16 font-mono text-xs"
                     :placeholder="apiKeyPlaceholder"
+                    autocomplete="new-password"
+                    data-bwignore="true"
+                    data-1p-ignore="true"
+                    data-lpignore="true"
+                    spellcheck="false"
                   />
                   <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     <button

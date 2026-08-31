@@ -65,7 +65,14 @@ export default {
       document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
       document.documentElement.setAttribute('lang', locale || 'en');
     },
-    async fetchUser() {
+    lastUserFetchTime: 0,
+    async fetchUser(force = false) {
+      const now = Date.now();
+      if (!force && now - this.lastUserFetchTime < 10000) {
+        return; // Throttle to at most once per 10 seconds
+      }
+      this.lastUserFetchTime = now;
+
       try {
         const response = await fetch('/auth/user', { cache: 'no-store' });
         if (response.ok) {
@@ -116,17 +123,13 @@ export default {
     this.applyDarkMode();
 
     // Check if user is logged in
-    this.fetchUser();
+    this.fetchUser(true);
   },
   mounted() {
-    // Re-validate session whenever user switches back to this tab or navigates back/forward
-    window.addEventListener('pageshow', this.handleVisibilityOrFocus);
-    window.addEventListener('focus', this.handleVisibilityOrFocus);
+    // Re-validate session when user switches back to this tab
     document.addEventListener('visibilitychange', this.handleVisibilityOrFocus);
   },
   beforeUnmount() {
-    window.removeEventListener('pageshow', this.handleVisibilityOrFocus);
-    window.removeEventListener('focus', this.handleVisibilityOrFocus);
     document.removeEventListener('visibilitychange', this.handleVisibilityOrFocus);
   },
 };
