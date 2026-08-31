@@ -109,6 +109,9 @@ export default {
     logout() {
       fetch('/auth/logout', { method: 'POST' })
         .then(() => {
+          try {
+            localStorage.removeItem('wiki_user');
+          } catch (e) {}
           this.$emit('update:user', null);
         })
         .catch(err => console.error('Logout error:', err));

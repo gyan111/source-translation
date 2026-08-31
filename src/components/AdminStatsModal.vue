@@ -163,7 +163,7 @@
                     {{ index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}` }}
                   </div>
                   <div class="truncate">
-                    <div class="text-xs font-bold text-indigo-300 truncate hover:underline">
+                    <div class="text-xs font-bold text-indigo-300 truncate">
                       {{ editor.wikiUser }}
                     </div>
                     <div class="text-[10px] text-gray-400 flex items-center space-x-2 mt-0.5">
@@ -174,7 +174,19 @@
                   </div>
                 </div>
 
-                <span class="material-icons text-gray-500 text-sm">arrow_forward</span>
+                <div class="flex items-center space-x-1.5 shrink-0">
+                  <a 
+                    :href="`https://meta.wikimedia.org/wiki/Special:Contributions/${encodeURIComponent(editor.wikiUser)}`" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    @click.stop 
+                    class="p-1 rounded-lg text-gray-400 hover:text-indigo-300 hover:bg-gray-700/60 transition-colors"
+                    title="View user's Wikimedia contributions"
+                  >
+                    <span class="material-icons text-sm">open_in_new</span>
+                  </a>
+                  <span class="material-icons text-gray-500 text-sm">arrow_forward</span>
+                </div>
               </div>
             </div>
           </div>
@@ -324,15 +336,26 @@
                       {{ formatTime(event.createdAt) }}
                     </td>
                     <td class="py-2.5 px-3 font-medium whitespace-nowrap">
-                      <span 
-                        v-if="event.wikiUser && event.wikiUser !== 'anonymous'" 
-                        @click="filterByUser(event.wikiUser)"
-                        class="text-indigo-300 hover:text-indigo-200 hover:underline cursor-pointer flex items-center space-x-1"
-                        title="Filter activity by this editor"
-                      >
-                        <span>{{ event.wikiUser }}</span>
-                        <span class="material-icons text-[10px] opacity-60">filter_alt</span>
-                      </span>
+                      <div v-if="event.wikiUser && event.wikiUser !== 'anonymous'" class="inline-flex items-center space-x-1.5">
+                        <span 
+                          @click="filterByUser(event.wikiUser)"
+                          class="text-indigo-300 hover:text-indigo-200 hover:underline cursor-pointer inline-flex items-center space-x-1"
+                          title="Filter activity by this editor"
+                        >
+                          <span>{{ event.wikiUser }}</span>
+                          <span class="material-icons text-[10px] opacity-60">filter_alt</span>
+                        </span>
+                        <a 
+                          :href="`https://${event.targetLang || 'meta'}.wikipedia.org/wiki/Special:Contributions/${encodeURIComponent(event.wikiUser)}`"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          @click.stop
+                          class="text-gray-500 hover:text-indigo-300 transition-colors inline-flex items-center"
+                          title="View user contributions on Wikipedia"
+                        >
+                          <span class="material-icons text-[12px]">open_in_new</span>
+                        </a>
+                      </div>
                       <span v-else class="text-gray-500 italic">Anonymous</span>
                     </td>
                     <td class="py-2.5 px-3 whitespace-nowrap">

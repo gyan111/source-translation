@@ -150,9 +150,13 @@
       <!-- Action Bar (When paragraphs are loaded) -->
       <div v-if="currentMode === 'article' && paragraphs.length" class="flex flex-wrap items-center justify-between gap-2.5 pt-3.5 mt-3.5 border-t border-slate-200/70 dark:border-white/[0.06]">
         <div class="flex items-center gap-2">
-          <button @click="translateAllPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5">
+          <button v-if="!isTranslatingAll" @click="translateAllPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
             <span class="material-icons-round text-sm">auto_fix_high</span>
             <span>{{ $t('toolbar.translateAllPending') }}</span>
+          </button>
+          <button v-else @click="cancelTranslateAll" class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer">
+            <span class="material-icons-round text-sm">stop_circle</span>
+            <span>Cancel Translation</span>
           </button>
         </div>
 
@@ -566,9 +570,19 @@
                   <p class="text-xs text-slate-500 dark:text-zinc-400">Configure machine translation services, AI models & credentials</p>
                 </div>
               </div>
-              <button @click="showProviderModal = false" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors" title="Close">
-                <span class="material-icons-round text-lg">close</span>
-              </button>
+              <div class="flex items-center gap-2">
+                <button 
+                  @click="saveProviderSettings" 
+                  :disabled="isKeyRequiredAndMissing" 
+                  class="btn-primary text-xs px-3.5 py-1.5 flex items-center gap-1 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span class="material-icons-round text-xs">check</span>
+                  Save & Apply
+                </button>
+                <button @click="showProviderModal = false" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors" title="Close">
+                  <span class="material-icons-round text-lg">close</span>
+                </button>
+              </div>
             </div>
 
             <div class="space-y-4 text-xs">
@@ -583,14 +597,27 @@
                 </label>
                 <select v-model="translationService" class="select-field font-medium">
                   <option value="mint">Wikimedia MinT (100% Free, Built-in)</option>
+                  <option value="google">Google Cloud Translation (Free via Server Key)</option>
+                  <option value="groq">Groq Cloud AI (Ultra-fast)</option>
                   <option value="deepl">DeepL Translator (Free 500k chars/mo or Pro)</option>
                   <option value="openai">OpenAI GPT (GPT-4o, GPT-4o-mini)</option>
-                  <option value="custom_openai">Universal AI (Groq, DeepSeek, OpenRouter, Ollama)</option>
-                  <option value="google">Google Cloud Translation API</option>
+                  <option value="custom_openai">Universal AI (DeepSeek, OpenRouter, Ollama)</option>
                   <option value="microsoft">Microsoft Azure Translator (Free 2M chars/mo)</option>
                   <option value="libretranslate">LibreTranslate (Open-source / Self-hosted)</option>
                   <option value="custom_rest">Custom REST MT Endpoint</option>
                 </select>
+              </div>
+
+              <!-- Alert badge for server-provided keys / free limits -->
+              <div v-if="serverQuotaNotice" class="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-300 text-[11px] flex items-start gap-2">
+                <span class="material-icons-round text-xs text-blue-500 shrink-0 mt-0.5">info</span>
+                <span>{{ serverQuotaNotice }}</span>
+              </div>
+
+              <!-- Warning badge if key is required and missing -->
+              <div v-if="isKeyRequiredAndMissing" class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-[11px] flex items-start gap-2">
+                <span class="material-icons-round text-xs text-amber-500 shrink-0 mt-0.5">warning</span>
+                <span>An API key is required to use <strong>{{ currentServiceDisplayName }}</strong>. Please enter your key below to enable save.</span>
               </div>
 
               <!-- Universal AI Sub-presets (Groq / DeepSeek / OpenRouter / Ollama) -->
@@ -766,10 +793,14 @@
             <div class="mt-6 flex items-center justify-between border-t border-slate-200/80 dark:border-white/[0.08] pt-4">
               <div class="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1">
                 <span class="material-icons-round text-xs text-emerald-500">lock</span>
-                <span>Keys stored locally in your browser</span>
+                <span>Keys stored securely in your browser</span>
               </div>
-              <button @click="showProviderModal = false" class="btn-primary text-xs px-5 py-2">
-                Done & Save
+              <button 
+                @click="saveProviderSettings" 
+                :disabled="isKeyRequiredAndMissing"
+                class="btn-primary text-xs px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save & Apply
               </button>
             </div>
           </div>
@@ -997,10 +1028,11 @@ export default {
     currentServiceDisplayName() {
       const map = {
         mint: 'Wikimedia MinT (Free)',
+        google: 'Google Cloud Translation',
+        groq: 'Groq Cloud AI',
         deepl: 'DeepL Translator',
         openai: 'OpenAI GPT',
         custom_openai: 'Universal AI / LLM',
-        google: 'Google Cloud',
         microsoft: 'Microsoft Azure',
         libretranslate: 'LibreTranslate',
         custom_rest: 'Custom REST MT',
@@ -1013,7 +1045,7 @@ export default {
           title: 'Wikimedia MinT',
           badge: '100% Free & Open (No Key Required)',
           badgeColor: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-          summary: 'Wikimedia\'s official hosted neural translation service powered by NLLB-200, Opus-MT, and Madlad-400.',
+          summary: 'Wikimedia\'s official hosted neural translation service powered by IndicTrans2, NLLB-200, and Opus-MT.',
           steps: [
             'No registration or API key is required.',
             'Built specifically for Wikipedia translation across 200+ languages.',
@@ -1021,6 +1053,36 @@ export default {
           ],
           link: 'https://www.mediawiki.org/wiki/MinT',
           linkText: 'Learn about Wikimedia MinT',
+        };
+      }
+      if (this.translationService === 'google') {
+        return {
+          title: 'Google Cloud Translation API',
+          badge: 'Free via Server Key',
+          badgeColor: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+          summary: 'Official Google Cloud Translation Basic (v2 REST API). Fast, high-accuracy translation with full language support.',
+          steps: [
+            'Server key is active and free to use up to daily quotas.',
+            'To use your own key: go to console.cloud.google.com → APIs & Services → Enable "Cloud Translation API".',
+            'Create an API key in Credentials and paste it below.',
+          ],
+          link: 'https://console.cloud.google.com/apis/credentials',
+          linkText: 'Get Google Cloud API Key',
+        };
+      }
+      if (this.translationService === 'groq') {
+        return {
+          title: 'Groq Cloud AI',
+          badge: 'Server Key Active for Logged-in Users',
+          badgeColor: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+          summary: 'Extremely fast neural inference with generous free daily limits.',
+          steps: [
+            'Logged-in Wikimedia users can use this service for free without a key.',
+            'To use your own key: create a free account at console.groq.com → API Keys.',
+            'Paste your key below.',
+          ],
+          link: 'https://console.groq.com/keys',
+          linkText: 'Get Free Groq API Key',
         };
       }
       if (this.translationService === 'deepl') {
@@ -1179,7 +1241,7 @@ export default {
       return null;
     },
     showApiKeyInput() {
-      return ['google', 'microsoft', 'openai', 'deepl', 'custom_openai', 'libretranslate', 'custom_rest'].includes(this.translationService);
+      return ['groq', 'google', 'microsoft', 'openai', 'deepl', 'custom_openai', 'libretranslate', 'custom_rest'].includes(this.translationService);
     },
     showEndpointInput() {
       return ['openai', 'custom_openai', 'libretranslate', 'custom_rest'].includes(this.translationService);
@@ -1188,6 +1250,8 @@ export default {
       return ['openai', 'custom_openai'].includes(this.translationService);
     },
     apiKeyPlaceholder() {
+      if (this.translationService === 'groq') return 'gsk_... (optional if logged in)';
+      if (this.translationService === 'google') return 'AIzaSy... (optional if logged in)';
       if (this.translationService === 'deepl') return 'DeepL API key (...:fx for free)';
       if (this.translationService === 'openai') return 'sk-... (required)';
       if (this.translationService === 'custom_openai') return 'API key (optional for Ollama)';
@@ -1255,12 +1319,26 @@ export default {
       const lang = this.languages.find(l => l.code === this.toLanguage);
       return lang ? lang.name : this.toLanguage;
     },
-    reviewedCount() {
+reviewedCount() {
       return this.paragraphs.filter(p => p.translation && p.reviewed).length;
     },
     reviewProgressPercent() {
       if (!this.translatedCount) return 0;
       return Math.round((this.reviewedCount / this.translatedCount) * 100);
+    },
+    isKeyRequiredAndMissing() {
+      const needsKey = ['deepl', 'openai', 'microsoft'].includes(this.translationService);
+      if (needsKey && !this.serviceInput?.trim()) return true;
+      return false;
+    },
+    serverQuotaNotice() {
+      if (this.translationService === 'google') {
+        return '⚡ Free via server key (capped daily) · Or enter your own key for dedicated quota';
+      }
+      if (this.translationService === 'groq') {
+        return '⚡ Free via server key · Or enter your own key for dedicated quota';
+      }
+      return null;
     },
     isFullyReviewed() {
       return this.paragraphs.length > 0 && this.translatedCount > 0 && this.paragraphs.every(p => !p.translation || p.reviewed);
@@ -1300,6 +1378,12 @@ export default {
   },
 
   methods: {
+    saveProviderSettings() {
+      if (this.isKeyRequiredAndMissing) return;
+      this.saveState();
+      this.showProviderModal = false;
+      this.showToast('Translation settings saved successfully!', 'success');
+    },
     trackAnalyticsEvent(eventType, extra = {}) {
       try {
         const text = this.fullTranslatedText || this.wikitextTranslated || this.templateTranslated || '';
@@ -1360,11 +1444,6 @@ export default {
       }
       if (this.translationService === 'deepl' && !this.serviceInput.trim()) {
         this.showToast('DeepL API key is required. Opening configuration...', 'warning');
-        this.showProviderModal = true;
-        return false;
-      }
-      if (this.translationService === 'google' && !this.serviceInput.trim()) {
-        this.showToast('Google Cloud API key is required. Opening configuration...', 'warning');
         this.showProviderModal = true;
         return false;
       }
@@ -1670,6 +1749,8 @@ export default {
       // Ensure headings have clean section boundaries
       let cleaned = wikitext.replace(/([^\n])\n([ \t]*={2,}[^\n=]+={2,})/g, '$1\n\n$2');
       cleaned = cleaned.replace(/(={2,}[^\n=]+={2,}[ \t]*)\n([^\n=])/g, '$1\n\n$2');
+      // Ensure multi-line template endings (e.g. Infobox closing }}) followed directly by prose or templates have clean section breaks
+      cleaned = cleaned.replace(/(\n\}\}[ \t]*)\n([^\n])/g, '$1\n\n$2');
 
       const parts = cleaned.split(/\n\n+/).filter(p => p.trim() !== '');
       this.paragraphs = parts.map(source => ({

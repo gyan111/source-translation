@@ -1,11 +1,22 @@
 import axios from 'axios';
-import { translateWikitext, translateTemplate as pipelineTranslateTemplate } from '../../server/services/translationPipeline.js';
-import { getAvailableServices } from '../../server/services/translationService.js';
+import { translateWikitext, translateTemplate as pipelineTranslateTemplate } from '../services/translationPipeline.js';
+import { getAvailableServices } from '../services/translationService.js';
 
-// Simple in-memory sliding window rate limiter
+// In-memory sliding window rate limiter with periodic cleanup and size bounding
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 100;
+const MAX_RATE_LIMIT_ENTRIES = 10000;
+
+// Periodic cleanup of stale rate-limit entries every 2 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap.entries()) {
+    if (now - entry.startTime > RATE_LIMIT_WINDOW_MS) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, 2 * 60 * 1000).unref();
 
 export const rateLimiter = (req, res, next) => {
   const ip = req.ip || req.headers['x-forwarded-for'] || 'anonymous';
@@ -13,6 +24,11 @@ export const rateLimiter = (req, res, next) => {
   
   let entry = rateLimitMap.get(ip);
   if (!entry || now - entry.startTime > RATE_LIMIT_WINDOW_MS) {
+    // Evict oldest if capacity exceeded
+    if (rateLimitMap.size >= MAX_RATE_LIMIT_ENTRIES) {
+      const firstKey = rateLimitMap.keys().next().value;
+      if (firstKey) rateLimitMap.delete(firstKey);
+    }
     entry = { count: 1, startTime: now };
     rateLimitMap.set(ip, entry);
     return next();

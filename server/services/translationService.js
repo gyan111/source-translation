@@ -51,27 +51,46 @@ export async function translateText(text, fromLang, toLang, service, options = {
  * Returns a Map of { originalText: translatedText }.
  */
 export async function translateTexts(texts, fromLang, toLang, service, options = {}) {
-  const uniqueTexts = [...new Set(texts.filter(t => t && t.trim()))];
-  const result = {};
+  const uniqueTrimmed = [...new Set(texts.filter(t => t && typeof t === 'string' && t.trim()).map(t => t.trim()))];
+  const translatedMap = {};
 
   // Translate concurrently with concurrency limit
   const CONCURRENCY = 3;
-  for (let i = 0; i < uniqueTexts.length; i += CONCURRENCY) {
-    const batch = uniqueTexts.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < uniqueTrimmed.length; i += CONCURRENCY) {
+    const batch = uniqueTrimmed.slice(i, i + CONCURRENCY);
     const translations = await Promise.all(
-      batch.map(async (text) => {
+      batch.map(async (trimmed) => {
         try {
-          const translated = await translateText(text, fromLang, toLang, service, options);
-          return { original: text, translated };
+          const translated = await translateText(trimmed, fromLang, toLang, service, options);
+          return { trimmed, translated: translated || trimmed };
         } catch (err) {
-          console.error(`Translation failed for chunk (${text.length} chars): ${err.message}`);
-          return { original: text, translated: text };
+          console.error(`Translation failed for chunk (${trimmed.length} chars): ${err.message}`);
+          return { trimmed, translated: trimmed };
         }
       })
     );
-    for (const { original, translated } of translations) {
-      result[original] = translated;
+    for (const { trimmed, translated } of translations) {
+      translatedMap[trimmed] = translated;
     }
+  }
+
+  const result = {};
+  for (const t of texts) {
+    if (!t || typeof t !== 'string') continue;
+    const trimmed = t.trim();
+    if (!trimmed) {
+      result[t] = t;
+      continue;
+    }
+    const translated = translatedMap[trimmed] ?? trimmed;
+    // Map under trimmed key
+    result[trimmed] = translated;
+    // Also map under original raw key with surrounding whitespace preserved
+    const leadingWsMatch = t.match(/^\s+/);
+    const trailingWsMatch = t.match(/\s+$/);
+    const leadingWs = leadingWsMatch ? leadingWsMatch[0] : '';
+    const trailingWs = trailingWsMatch ? trailingWsMatch[0] : '';
+    result[t] = `${leadingWs}${translated ? translated.trim() : ''}${trailingWs}`;
   }
 
   return result;
@@ -81,15 +100,68 @@ export async function translateTexts(texts, fromLang, toLang, service, options =
  * Get list of available translation services with metadata.
  */
 export function getAvailableServices() {
+  const hasServerGoogle = Boolean(process.env.GOOGLE_TRANSLATE_API_KEY);
+  const hasServerGroq = Boolean(process.env.GROQ_API_KEY);
+
   return [
-    { id: 'mint', name: 'Wikimedia MinT', requiresKey: false, description: 'Free machine translation by Wikimedia. Best for Wikipedia content.' },
-    { id: 'deepl', name: 'DeepL Translator', requiresKey: true, description: 'DeepL API (Free or Pro). Renowned quality for world languages.' },
-    { id: 'openai', name: 'OpenAI GPT', requiresKey: true, description: 'High-quality translation using OpenAI models. Requires API key.' },
-    { id: 'custom_openai', name: 'Universal AI / Custom LLM (Groq, DeepSeek, Ollama, OpenRouter)', requiresKey: false, description: 'Connect to any OpenAI-compatible AI API (Groq, DeepSeek, Ollama, LM Studio, etc.).' },
-    { id: 'google', name: 'Google Cloud Translation', requiresKey: true, description: 'Official Google Cloud Translation API v2. Requires API key.' },
-    { id: 'microsoft', name: 'Microsoft Azure Translator', requiresKey: true, description: 'Official Azure AI Translator API. Requires API key.' },
-    { id: 'libretranslate', name: 'LibreTranslate', requiresKey: false, description: 'Open-source translation. Self-hostable or use public instance.' },
-    { id: 'custom_rest', name: 'Custom REST MT Endpoint', requiresKey: false, description: 'Connect to any custom machine translation HTTP API.' },
+    { 
+      id: 'mint', 
+      name: 'Wikimedia MinT', 
+      requiresKey: false, 
+      description: 'Free neural machine translation by Wikimedia. Best for Wikipedia content.' 
+    },
+    { 
+      id: 'google', 
+      name: 'Google Cloud Translation', 
+      requiresKey: !hasServerGoogle, 
+      description: hasServerGoogle 
+        ? 'Official Google Cloud Translation v2 (Server key enabled).' 
+        : 'Official Google Cloud Translation API v2. Requires Google Cloud API key.' 
+    },
+    { 
+      id: 'groq', 
+      name: 'Groq Cloud AI', 
+      requiresKey: !hasServerGroq, 
+      description: hasServerGroq 
+        ? 'Ultra-fast AI translation powered by Groq LPUs (Server key enabled for logged-in users).' 
+        : 'Ultra-fast AI translation powered by Groq LPUs. Free API key available at console.groq.com.' 
+    },
+    { 
+      id: 'deepl', 
+      name: 'DeepL Translator', 
+      requiresKey: true, 
+      description: 'DeepL API (Free or Pro). Renowned quality for European and world languages.' 
+    },
+    { 
+      id: 'openai', 
+      name: 'OpenAI GPT', 
+      requiresKey: true, 
+      description: 'High-quality translation using OpenAI GPT-4o models. Requires API key.' 
+    },
+    { 
+      id: 'custom_openai', 
+      name: 'Universal AI / Custom LLM (DeepSeek, Ollama, OpenRouter)', 
+      requiresKey: false, 
+      description: 'Connect to any OpenAI-compatible AI API endpoint.' 
+    },
+    { 
+      id: 'microsoft', 
+      name: 'Microsoft Azure Translator', 
+      requiresKey: true, 
+      description: 'Official Azure AI Translator API. Requires API key.' 
+    },
+    { 
+      id: 'libretranslate', 
+      name: 'LibreTranslate', 
+      requiresKey: false, 
+      description: 'Open-source translation. Self-hostable or use public instance.' 
+    },
+    { 
+      id: 'custom_rest', 
+      name: 'Custom REST MT Endpoint', 
+      requiresKey: false, 
+      description: 'Connect to any custom machine translation HTTP API.' 
+    },
   ];
 }
 
@@ -105,6 +177,12 @@ async function callWithRetry(adapter, text, fromLang, toLang, options) {
       throw new Error('Empty translation returned');
     } catch (err) {
       lastError = err;
+      const status = err.response?.status;
+      // Do not stall on auth (401/403) or rate-limit (429) failures
+      if (status === 401 || status === 403 || status === 429) {
+        console.warn(`Translation failed with HTTP ${status}: ${err.message}. Skipping retries.`);
+        break;
+      }
       if (attempt < MAX_RETRIES - 1) {
         const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
         console.warn(`Translation attempt ${attempt + 1} failed: ${err.message}. Retrying in ${delay}ms...`);
@@ -116,9 +194,70 @@ async function callWithRetry(adapter, text, fromLang, toLang, options) {
   return text;
 }
 
+// ──────────────────────────── Endpoint Safety & Validation ────────────────────────────
+
+/**
+ * Validates whether a custom user-provided endpoint URL is safe to query (SSRF guard).
+ * Blocks cloud metadata IPs, non-HTTPS protocols (in prod), and private subnet hosts.
+ */
+export function validateSafeEndpoint(urlString) {
+  if (!urlString || typeof urlString !== 'string') {
+    throw new Error('Custom endpoint URL is required');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(urlString.trim());
+  } catch {
+    throw new Error('Invalid custom endpoint URL format');
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block AWS / OpenStack / Cloud metadata service IPs
+  if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal' || hostname === 'instance-data') {
+    throw new Error('Access to internal cloud metadata endpoints is prohibited');
+  }
+
+  const isDev = process.env.NODE_ENV !== 'production';
+  const protocol = parsed.protocol.toLowerCase();
+
+  // Enforce HTTPS unless local dev against localhost/127.0.0.1 (e.g. local Ollama)
+  if (protocol !== 'https:') {
+    const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    if (!isDev || !isLocalhost || protocol !== 'http:') {
+      throw new Error('Custom endpoints must use HTTPS protocol');
+    }
+  }
+
+  // Block private network address patterns in production
+  if (!isDev) {
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::1' ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local')
+    ) {
+      throw new Error('Access to internal/private network endpoints is prohibited');
+    }
+  }
+
+  return parsed.toString();
+}
+
 // ──────────────────────────── Adapters ────────────────────────────
 
+let wmcloudFailures = 0;
+let lastWmcloudFailure = 0;
 let wmcloudDownUntil = 0;
+
+let cxserverFailures = 0;
+let lastCxserverFailure = 0;
 let cxserverDownUntil = 0;
 
 /**
@@ -131,7 +270,15 @@ let cxserverDownUntil = 0;
 async function mintTranslate(text, fromLang, toLang, _options) {
   const now = Date.now();
 
-  // 1. Primary: MinT direct API (2.5s timeout with 60s circuit breaker)
+  // Reset failure count if last failure was over 30s ago
+  if (now - lastWmcloudFailure > 30000) {
+    wmcloudFailures = 0;
+  }
+  if (now - lastCxserverFailure > 30000) {
+    cxserverFailures = 0;
+  }
+
+  // 1. Primary: MinT direct API (6s timeout with multi-failure circuit breaker)
   if (now > wmcloudDownUntil) {
     try {
       const response = await axios.post('https://translate.wmcloud.org/api/translate', {
@@ -140,7 +287,7 @@ async function mintTranslate(text, fromLang, toLang, _options) {
         target_language: toLang,
         format: 'text',
       }, {
-        timeout: 2500,
+        timeout: 6000,
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
@@ -148,39 +295,20 @@ async function mintTranslate(text, fromLang, toLang, _options) {
       });
 
       if (response.data && response.data.translation) {
+        wmcloudFailures = 0; // Reset on success
         return response.data.translation;
       }
     } catch (err) {
-      wmcloudDownUntil = Date.now() + 60000;
-      console.warn(`MinT primary endpoint down (${err.code || err.message}). Circuit-breaking for 60s...`);
+      lastWmcloudFailure = Date.now();
+      wmcloudFailures++;
+      if (wmcloudFailures >= 3) {
+        wmcloudDownUntil = Date.now() + 15000; // 15s cooldown only after 3 consecutive failures
+        console.warn(`[MinT] 3 consecutive failures. Circuit breaker tripped for 15s.`);
+      }
     }
   }
 
-  // 2. Fallback: Wikimedia Content Translation API (cxserver) (2.5s timeout with 60s circuit breaker)
-  if (now > cxserverDownUntil) {
-    try {
-      const url = `https://cxserver.wikimedia.org/v2/translate/${fromLang}/${toLang}/MinT`;
-      const response = await axios.post(url, text, {
-        timeout: 2500,
-        headers: {
-          'Content-Type': 'text/plain',
-          'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
-        },
-      });
-
-      if (response.data && typeof response.data === 'string' && response.data.trim()) {
-        return response.data;
-      }
-      if (response.data && response.data.contents) {
-        return response.data.contents;
-      }
-    } catch (err2) {
-      cxserverDownUntil = Date.now() + 60000;
-      console.warn(`MinT cxserver fallback down: ${err2.message}. Circuit-breaking for 60s...`);
-    }
-  }
-
-  // 3. Fallback: Google Free GTX translation via POST (handles large paragraphs without URL limits)
+  // 2. Fallback 1: Fast Google Free GTX translation (sub-second response time)
   try {
     const response = await axios.post(
       'https://translate.googleapis.com/translate_a/single',
@@ -192,7 +320,7 @@ async function mintTranslate(text, fromLang, toLang, _options) {
         q: text,
       }).toString(),
       {
-        timeout: 10000,
+        timeout: 5000,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -200,15 +328,49 @@ async function mintTranslate(text, fromLang, toLang, _options) {
       }
     );
 
-    if (response.data && response.data[0]) {
-      const translated = response.data[0].map(chunk => chunk[0]).filter(Boolean).join('');
+    if (response.data && Array.isArray(response.data[0])) {
+      const translated = response.data[0]
+        .map(segment => segment[0])
+        .filter(Boolean)
+        .join('');
       if (translated && translated.trim()) {
         return translated;
       }
     }
-  } catch (err3) {
-    console.warn(`Google GTX fallback failed: ${err3.message}`);
+  } catch (errGtx) {
+    // Proceed to cxserver fallback if GTX fails
   }
+
+  // 3. Fallback 2: Wikimedia Content Translation API (cxserver)
+  if (now > cxserverDownUntil) {
+    try {
+      const url = `https://cxserver.wikimedia.org/v2/translate/${fromLang}/${toLang}/MinT`;
+      const response = await axios.post(url, text, {
+        timeout: 4000,
+        headers: {
+          'Content-Type': 'text/plain',
+          'User-Agent': 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)',
+        },
+      });
+
+      if (response.data && typeof response.data === 'string' && response.data.trim()) {
+        cxserverFailures = 0;
+        return response.data;
+      }
+      if (response.data && response.data.contents) {
+        cxserverFailures = 0;
+        return response.data.contents;
+      }
+    } catch (err2) {
+      lastCxserverFailure = Date.now();
+      cxserverFailures++;
+      if (cxserverFailures >= 3) {
+        cxserverDownUntil = Date.now() + 15000;
+      }
+    }
+  }
+
+
 
   // 4. Fallback: Apertium via cxserver
   try {
@@ -238,11 +400,11 @@ async function mintTranslate(text, fromLang, toLang, _options) {
 
 /**
  * Google Cloud Translation API (v2 REST API).
- * Requires a valid Google Cloud API key.
+ * Uses server GOOGLE_TRANSLATE_API_KEY if available, or user-provided key.
  */
 async function googleTranslate(text, fromLang, toLang, options) {
-  const apiKey = options.apiKey;
-  if (!apiKey) throw new Error('Google Cloud API key is required');
+  const apiKey = options.apiKey || process.env.GOOGLE_TRANSLATE_API_KEY || '';
+  if (!apiKey) throw new Error('Google Cloud API key is required. Set GOOGLE_TRANSLATE_API_KEY in your environment or enter your API key.');
 
   try {
     const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
@@ -361,7 +523,8 @@ async function openaiTranslate(text, fromLang, toLang, options) {
  * LibreTranslate - open-source, self-hostable translation.
  */
 async function libreTranslate(text, fromLang, toLang, options) {
-  const endpoint = options.apiEndpoint || 'https://libretranslate.com/translate';
+  const rawEndpoint = options.apiEndpoint || 'https://libretranslate.com/translate';
+  const endpoint = validateSafeEndpoint(rawEndpoint);
   const apiKey = options.apiKey || '';
 
   const payload = {
@@ -464,7 +627,8 @@ async function deeplTranslate(text, fromLang, toLang, options) {
  * Works with Groq, DeepSeek, Ollama, LM Studio, vLLM, OpenRouter, Mistral, etc.
  */
 async function customOpenaiTranslate(text, fromLang, toLang, options) {
-  const endpoint = options.apiEndpoint || 'https://api.openai.com/v1/chat/completions';
+  const rawEndpoint = options.apiEndpoint || 'https://api.openai.com/v1/chat/completions';
+  const endpoint = validateSafeEndpoint(rawEndpoint);
   const model = options.model || 'gpt-4o-mini';
   const apiKey = options.apiKey || '';
 
@@ -502,6 +666,8 @@ async function customRestTranslate(text, fromLang, toLang, options) {
     throw new Error('Custom REST MT requires an endpoint URL');
   }
 
+  const endpoint = validateSafeEndpoint(options.apiEndpoint);
+
   const payload = {
     q: text,
     text,
@@ -514,7 +680,7 @@ async function customRestTranslate(text, fromLang, toLang, options) {
   const headers = { 'Content-Type': 'application/json' };
   if (options.apiKey) headers.Authorization = `Bearer ${options.apiKey}`;
 
-  const response = await axios.post(options.apiEndpoint, payload, {
+  const response = await axios.post(endpoint, payload, {
     headers,
     timeout: REQUEST_TIMEOUT,
   });
@@ -526,9 +692,125 @@ async function customRestTranslate(text, fromLang, toLang, options) {
   throw new Error('Custom REST endpoint did not return a valid translation field');
 }
 
+/**
+ * Groq Cloud AI Translation.
+ * Fast, free open-source LLM inference.
+ * Uses server GROQ_API_KEY if available, or user-provided key.
+ */
+async function groqTranslate(text, fromLang, toLang, options) {
+  const apiKey = options.apiKey || process.env.GROQ_API_KEY || '';
+  if (!apiKey) throw new Error('Groq API key is required. Set GROQ_API_KEY in your environment or enter your key from console.groq.com.');
+
+  const candidateModels = [
+    options.model,
+    process.env.GROQ_MODEL,
+    'qwen/qwen3.8-27b',
+    'qwen/qwen3.6-27b',
+    'openai/gpt-oss-120b',
+    'llama-3.3-70b-versatile',
+  ].filter(Boolean);
+
+  const systemPrompt = `You are an expert Wikipedia translator. Translate the provided text from ${fromLang} to ${toLang}.
+Preserve all wiki formatting, [[wikilinks]], {{templates}}, numbers, and special symbols intact.
+Return ONLY the translated text without explanations, greetings, quotes, or markdown code fences.`;
+
+  let lastError = null;
+  for (const model of candidateModels) {
+    try {
+      const payload = {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text },
+        ],
+        temperature: 0.2,
+      };
+
+      const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        timeout: REQUEST_TIMEOUT * 2,
+      });
+
+      const translated = response.data?.choices?.[0]?.message?.content;
+      if (translated) return translated.trim();
+    } catch (err) {
+      lastError = err;
+      if (err.response?.status === 404 || err.response?.data?.error?.code === 'model_not_found') {
+        continue; // Try next candidate model
+      }
+      throw err;
+    }
+  }
+
+  throw lastError || new Error('Empty response from Groq AI provider');
+}
+
+/**
+ * Google Gemini AI Translation.
+ * Supports Gemini Flash models via Google AI Studio / Generative Language API.
+ */
+async function geminiTranslate(text, fromLang, toLang, options) {
+  const apiKey = options.apiKey || process.env.GEMINI_API_KEY || '';
+  if (!apiKey) throw new Error('Google Gemini API key is required. Set GEMINI_API_KEY in your environment or enter your key from aistudio.google.com.');
+
+  const candidateModels = [
+    options.model,
+    process.env.GEMINI_MODEL,
+    'gemini-3.6-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ].filter(Boolean);
+
+  const systemInstruction = `You are an expert Wikipedia translator. Translate the provided text from ${fromLang} to ${toLang}.
+Preserve all wiki formatting, [[wikilinks]], {{templates}}, <ref> footnotes, markup, numbers, and special symbols intact.
+Return ONLY the translated text without explanations, greetings, quotes, or markdown code fences.`;
+
+  let lastError = null;
+  for (const model of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: `${systemInstruction}\n\nText to translate:\n${text}` }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+        }
+      };
+
+      const response = await axios.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: REQUEST_TIMEOUT * 2,
+      });
+
+      const translated = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (translated) return translated.trim();
+    } catch (err) {
+      lastError = err;
+      if (err.response?.status === 404) {
+        continue; // Model deprecated/not found, try next candidate
+      }
+      throw err;
+    }
+  }
+
+  throw lastError || new Error('Empty response from Google Gemini AI');
+}
+
 // Adapter registry
 const ADAPTERS = {
   mint: mintTranslate,
+  gemini: geminiTranslate,
+  groq: groqTranslate,
   deepl: deeplTranslate,
   google: googleTranslate,
   microsoft: microsoftTranslate,

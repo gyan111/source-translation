@@ -1,4 +1,10 @@
+import dns from 'dns';
 import express from 'express';
+
+// Prioritize IPv4 DNS lookups to eliminate IPv6 routing delays/ENETUNREACH on Linux/Toolforge
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 import bodyParser from 'body-parser';
 import session from 'express-session';
 import path from 'path';
@@ -46,14 +52,16 @@ app.set('trust proxy', 1);
 
 // Session middleware for OAuth
 app.use(session({
+  name: 'st_session',
   secret: process.env.SESSION_SECRET || 'source-translation-secret-key',
   resave: false,
   saveUninitialized: false,
   rolling: true, // Reset session expiration timer on each request
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: 'auto', // Automatically uses Secure on HTTPS while allowing local dev
+    httpOnly: true,
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   },
 }));
 

@@ -13,6 +13,7 @@ describe('translationService', () => {
     const services = getAvailableServices();
     const serviceIds = services.map(s => s.id);
     expect(serviceIds).toContain('mint');
+    expect(serviceIds).toContain('groq');
     expect(serviceIds).toContain('deepl');
     expect(serviceIds).toContain('google');
     expect(serviceIds).toContain('microsoft');
@@ -98,5 +99,12 @@ describe('translationService', () => {
     const result = await translateTexts(texts, 'en', 'fr', 'mint');
     expect(result).toHaveProperty('Hello');
     expect(result).toHaveProperty('World');
+  });
+
+  it('blocks SSRF metadata endpoints via validateSafeEndpoint', async () => {
+    const { validateSafeEndpoint } = await import('../server/services/translationService.js');
+    expect(() => validateSafeEndpoint('http://169.254.169.254/latest/meta-data/')).toThrow(/metadata/i);
+    expect(() => validateSafeEndpoint('http://metadata.google.internal/computeMetadata/v1/')).toThrow(/metadata/i);
+    expect(() => validateSafeEndpoint('ftp://example.com/api')).toThrow(/protocol/i);
   });
 });

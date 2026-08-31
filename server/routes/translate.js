@@ -1,5 +1,5 @@
 import express from 'express';
-import { translate, translateTemplate, services, rateLimiter } from '../../src/controllers/translationController.js';
+import { translate, translateTemplate, services, rateLimiter } from '../controllers/translationController.js';
 
 const router = express.Router();
 

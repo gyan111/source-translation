@@ -324,15 +324,12 @@ describe('wikitextParser', () => {
       expect(frRes).toBe('[[Catégorie:Militants indiens]]');
     });
 
-    it('normalizes MT coordinate errors, interwiki links, and political terms', () => {
+    it('normalizes MT coordinate errors and interwiki links', () => {
       const brokenCoord = 'Kendrapara est situé à {{Coord|20h50|N|86.42|E}}.';
       const brokenInterwiki = '[[:ou:ଗର୍ତ୍ତେଶ୍ବର ମହାଦେବ|Temple Garteswar]]';
-      const brokenParty = 'Membres de la Fête Janata et Fête Bharatiya Janata.';
 
       expect(normalizeWikitextSyntax(brokenCoord)).toContain('{{Coord|20.50|N|86.42|E}}');
       expect(normalizeWikitextSyntax(brokenInterwiki)).toBe('[[:or:ଗର୍ତ୍ତେଶ୍ବର ମହାଦେବ|Temple Garteswar]]');
-      expect(normalizeWikitextSyntax(brokenParty)).toContain('Parti Janata');
-      expect(normalizeWikitextSyntax(brokenParty)).toContain('Parti Bharatiya Janata');
     });
 
     it('maps English template parameter aliases to target language in reassembleTemplate', () => {

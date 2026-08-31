@@ -293,6 +293,8 @@ export function extractCategoryTargets(segments) {
  */
 export function extractLinkTargets(segments) {
   const targets = [];
+  const nonArticlePrefixes = [...CATEGORY_PREFIXES, ...FILE_PREFIXES].map(p => p.toLowerCase() + ':');
+
   for (const s of segments) {
     if (s.type === 'link' && s.target) {
       targets.push(s.target);
@@ -301,7 +303,8 @@ export function extractLinkTargets(segments) {
       for (const m of matches) {
         const innerTarget = m[1].trim();
         const lower = innerTarget.toLowerCase();
-        if (!lower.startsWith('category:') && !lower.startsWith('file:') && !lower.startsWith('image:') && !lower.startsWith('ଫାଇଲ:') && !lower.startsWith('चित्र:')) {
+        const isNonArticle = nonArticlePrefixes.some(prefix => lower.startsWith(prefix));
+        if (!isNonArticle) {
           targets.push(innerTarget);
         }
       }
@@ -490,7 +493,7 @@ function splitTemplateParams(str) {
       current += ch + next;
       i++;
     } else if ((ch === '}' && next === '}') || (ch === ']' && next === ']')) {
-      depth--;
+      depth = Math.max(0, depth - 1);
       current += ch + next;
       i++;
     } else if (ch === '|' && depth === 0) {
@@ -542,13 +545,21 @@ export function normalizeWikitextSyntax(wikitext) {
 
   let result = normalizedLines.join('\n');
 
-  // Fix extra spacing inside wikilinks and normalize [[ Foo | Foo ]] -> [[Foo]]
-  result = result.replace(/\[\[\s*([^\]|]+?)\s*\|\s*([^\]]+?)\s*\]\]/g, (match, target, display) => {
-    const t = target.trim();
-    const d = display.trim();
-    return t === d ? `[[${t}]]` : `[[${t}|${d}]]`;
+  // Fix spaced bold/italic markers introduced by MT: "'' '", "' ''", "' ' '", "' '" -> "'''"
+  result = result.replace(/['\u2018\u2019\u02BC]+(?:\s+['\u2018\u2019\u02BC]+)+/g, (m) => {
+    const count = (m.match(/['\u2018\u2019\u02BC]/g) || []).length;
+    return count >= 2 ? "'''" : "'";
   });
-  result = result.replace(/\[\[\s*([^\]|]+?)\s*\]\]/g, '[[$1]]');
+
+  // Fix extra spacing and stray pipes inside wikilinks: e.g. [[ Target || Display ]] -> [[ Target | Display ]]
+  result = result.replace(/\[\[\s*([^\]]+?)\s*\]\]/g, (match, inner) => {
+    const pipeParts = inner.split('|').map(p => p.trim()).filter(Boolean);
+    if (pipeParts.length === 0) return '';
+    if (pipeParts.length === 1) return `[[${pipeParts[0]}]]`;
+    const target = pipeParts[0];
+    const display = pipeParts.slice(1).join('|').trim();
+    return target === display ? `[[${target}]]` : `[[${target}|${display}]]`;
+  });
 
   // Fix missing space between prose words and opening wikilinks: e.g. "ਪਿੰਡ[[ਕਟକ]]" or "le[[Père" -> "ਪਿੰਡ [[ਕਟକ]]", "le [[Père"
   result = result.replace(/([^\s\[{=(|:;«"'/\p{P}])(\[\[)/gu, '$1 $2');
@@ -561,14 +572,6 @@ export function normalizeWikitextSyntax(wikitext) {
 
   // Fix interwiki prefix translated to French word "ou"
   result = result.replace(/\[\[:ou:/g, '[[:or:');
-
-  // Fix political party translated to "Fête" in French
-  result = result.replace(/\bFête\s+([A-ZÀ-Ý][a-zà-ÿ]+(?:\s+[A-ZÀ-Ý][a-zà-ÿ]+)*)/g, (match, p1) => {
-    if (['Janata', 'Bharatiya', 'Congress', 'Travailliste', 'Socialiste', 'Démocrate', 'Républicain'].includes(p1.split(' ')[0])) {
-      return `Parti ${p1}`;
-    }
-    return match;
-  });
 
   // Remove any stray placeholder artifacts (e.g. \x00COMMENT_0\x00 or ◆COMMENT_0◆)
   result = result.replace(/\x00[A-Z]+_\d+\x00/g, '');
@@ -611,8 +614,19 @@ export function reassembleWikitext(
   for (const seg of segments) {
     switch (seg.type) {
       case 'text': {
-        const text = translatedTexts[seg.content] ?? seg.content;
-        parts.push(text);
+        let text = translatedTexts[seg.content];
+        if (text === undefined && seg.content && seg.content.trim()) {
+          const trimmed = seg.content.trim();
+          const translatedTrimmed = translatedTexts[trimmed];
+          if (translatedTrimmed !== undefined) {
+            const leadingWsMatch = seg.content.match(/^\s+/);
+            const trailingWsMatch = seg.content.match(/\s+$/);
+            const leadingWs = leadingWsMatch ? leadingWsMatch[0] : '';
+            const trailingWs = trailingWsMatch ? trailingWsMatch[0] : '';
+            text = `${leadingWs}${translatedTrimmed.trim()}${trailingWs}`;
+          }
+        }
+        parts.push(text ?? seg.content);
         break;
       }
 
@@ -625,26 +639,28 @@ export function reassembleWikitext(
       }
 
       case 'link': {
+        const cleanLink = (s) => (s ? String(s).replace(/^[|।\s]+|[|।\s]+$/g, '').trim() : '');
         const resolvedTarget = translatedLinks[seg.target];
         const isWikidataResolved = resolvedTarget && resolvedTarget !== seg.target;
 
         if (isWikidataResolved) {
           // Article exists on target wiki (Wikidata resolved)
-          const newTarget = resolvedTarget;
+          const newTarget = cleanLink(resolvedTarget);
           if (seg.display) {
-            const newDisplay = translatedDisplayTexts[seg.display] ?? seg.display;
-            if (newDisplay === newTarget) {
+            const rawDisplay = translatedDisplayTexts[seg.display] ?? seg.display;
+            const newDisplay = cleanLink(rawDisplay);
+            if (!newDisplay || newDisplay === newTarget) {
               parts.push(`[[${newTarget}]]`);
             } else {
               parts.push(`[[${newTarget}|${newDisplay}]]`);
             }
           } else {
-            let display = translatedDisplayTexts[seg.target] ?? newTarget;
+            let display = cleanLink(translatedDisplayTexts[seg.target] ?? newTarget);
             const parenMatch = display.match(/^(.+?)\s*\([^)]+\)$/);
             if (parenMatch && parenMatch[1].trim()) {
-              display = parenMatch[1].trim();
+              display = cleanLink(parenMatch[1]);
             }
-            if (display === newTarget) {
+            if (!display || display === newTarget) {
               parts.push(`[[${newTarget}]]`);
             } else {
               parts.push(`[[${newTarget}|${display}]]`);
@@ -653,13 +669,15 @@ export function reassembleWikitext(
         } else {
           // Article does NOT exist on target wiki (missing Wikidata sitelink)
           const hasUnresolvedTranslation = unresolvedTranslatedTargets && unresolvedTranslatedTargets[seg.target];
-          const translatedTarget = hasUnresolvedTranslation ? unresolvedTranslatedTargets[seg.target] : seg.target;
+          const rawTarget = hasUnresolvedTranslation ? unresolvedTranslatedTargets[seg.target] : seg.target;
+          const translatedTarget = cleanLink(rawTarget);
           const displaySource = seg.display || seg.target;
-          const translatedDisplay = translatedDisplayTexts[displaySource] ?? translatedTarget;
+          const rawDisplay = translatedDisplayTexts[displaySource] ?? translatedTarget;
+          const translatedDisplay = cleanLink(rawDisplay);
 
           if (missingLinkStrategy === 'plain' && hasUnresolvedTranslation) {
             // Strip link brackets, keep plain translated text
-            parts.push(translatedDisplay);
+            parts.push(translatedDisplay || translatedTarget);
           } else if (missingLinkStrategy === 'ill' && hasUnresolvedTranslation) {
             // Interlanguage template
             if (toLang === 'fr') {
@@ -668,26 +686,31 @@ export function reassembleWikitext(
               parts.push(`{{ill|${translatedTarget}|${fromLang}|${seg.target}}}`);
             }
           } else if (missingLinkStrategy === 'keep_source') {
-            if (seg.display || translatedDisplay !== seg.target) {
-              parts.push(`[[${seg.target}|${translatedDisplay}]]`);
+            const cleanSource = cleanLink(seg.target);
+            if (seg.display || (translatedDisplay && translatedDisplay !== cleanSource)) {
+              parts.push(`[[${cleanSource}|${translatedDisplay || cleanSource}]]`);
             } else {
-              const parenMatch = seg.target.match(/^(.+?)\s*\([^)]+\)$/);
+              const parenMatch = cleanSource.match(/^(.+?)\s*\([^)]+\)$/);
               if (parenMatch && parenMatch[1].trim()) {
-                parts.push(`[[${seg.target}|${parenMatch[1].trim()}]]`);
+                parts.push(`[[${cleanSource}|${cleanLink(parenMatch[1])}]]`);
               } else {
-                parts.push(`[[${seg.target}]]`);
+                parts.push(`[[${cleanSource}]]`);
               }
             }
           } else {
             // Default: 'translate' (Native Red Link) or unmodified original if no translation provided
             if (seg.display) {
-              parts.push(`[[${translatedTarget}|${translatedDisplay}]]`);
-            } else if (hasUnresolvedTranslation && translatedTarget !== translatedDisplay) {
+              if (translatedDisplay && translatedDisplay !== translatedTarget) {
+                parts.push(`[[${translatedTarget}|${translatedDisplay}]]`);
+              } else {
+                parts.push(`[[${translatedTarget}]]`);
+              }
+            } else if (hasUnresolvedTranslation && translatedTarget !== translatedDisplay && translatedDisplay) {
               parts.push(`[[${translatedTarget}|${translatedDisplay}]]`);
             } else {
               const parenMatch = translatedTarget.match(/^(.+?)\s*\([^)]+\)$/);
               if (parenMatch && parenMatch[1].trim()) {
-                parts.push(`[[${translatedTarget}|${parenMatch[1].trim()}]]`);
+                parts.push(`[[${translatedTarget}|${cleanLink(parenMatch[1])}]]`);
               } else {
                 parts.push(`[[${translatedTarget}]]`);
               }

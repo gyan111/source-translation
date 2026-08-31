@@ -67,21 +67,43 @@ export default {
     },
     async fetchUser() {
       try {
-        const response = await fetch('/auth/user');
+        const response = await fetch('/auth/user', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
           if (data && data.username) {
             this.user = data;
+            try {
+              localStorage.setItem('wiki_user', JSON.stringify(data));
+            } catch (e) {}
+            return;
           }
         }
+        // Explicitly unauthenticated response from server
+        this.user = null;
+        try {
+          localStorage.removeItem('wiki_user');
+        } catch (e) {}
       } catch (e) {
-        // Not logged in, that's fine
+        // Transient network error - preserve existing cached user if available
+      }
+    },
+    handleVisibilityOrFocus() {
+      if (document.visibilityState === 'visible') {
+        this.fetchUser();
       }
     },
   },
   created() {
     // Apply UI RTL / LTR direction based on current locale
     this.updateDocumentDirection(this.$i18n.locale);
+
+    // Restore cached user optimistically to prevent UI flashing
+    try {
+      const cachedUser = localStorage.getItem('wiki_user');
+      if (cachedUser) {
+        this.user = JSON.parse(cachedUser);
+      }
+    } catch (e) {}
 
     // Restore dark mode preference
     const saved = localStorage.getItem('dark-mode');
@@ -95,6 +117,17 @@ export default {
 
     // Check if user is logged in
     this.fetchUser();
+  },
+  mounted() {
+    // Re-validate session whenever user switches back to this tab or navigates back/forward
+    window.addEventListener('pageshow', this.handleVisibilityOrFocus);
+    window.addEventListener('focus', this.handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', this.handleVisibilityOrFocus);
+  },
+  beforeUnmount() {
+    window.removeEventListener('pageshow', this.handleVisibilityOrFocus);
+    window.removeEventListener('focus', this.handleVisibilityOrFocus);
+    document.removeEventListener('visibilitychange', this.handleVisibilityOrFocus);
   },
 };
 </script>

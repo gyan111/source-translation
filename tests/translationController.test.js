@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import axios from 'axios';
-import { preview, services } from '../src/controllers/translationController.js';
+import { preview, services } from '../server/controllers/translationController.js';
 
 vi.mock('axios');
 
