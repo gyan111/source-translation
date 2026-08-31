@@ -758,6 +758,7 @@
                 </div>
                 <div class="relative">
                   <input
+                    ref="apiKeyInput"
                     v-model="serviceInput"
                     :type="showApiKey ? 'text' : 'password'"
                     class="input-field pr-16 font-mono text-xs"
@@ -768,23 +769,22 @@
                     data-lpignore="true"
                     spellcheck="false"
                   />
-                  <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
                     <button
-                      v-if="serviceInput"
                       type="button"
-                      @click="deleteCurrentApiKey"
-                      class="text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-0.5 rounded"
+                      @click.stop.prevent="deleteCurrentApiKey"
+                      class="text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30"
                       title="Delete key from local storage"
                     >
-                      <span class="material-icons-round text-sm">clear</span>
+                      <span class="material-icons-round text-sm block">clear</span>
                     </button>
                     <button
                       type="button"
-                      @click="showApiKey = !showApiKey"
-                      class="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors p-0.5 rounded"
+                      @click.stop.prevent="showApiKey = !showApiKey"
+                      class="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors p-1 rounded hover:bg-slate-100 dark:hover:bg-zinc-800"
                       :title="showApiKey ? 'Hide key' : 'Show key'"
                     >
-                      <span class="material-icons-round text-sm">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
+                      <span class="material-icons-round text-sm block">{{ showApiKey ? 'visibility_off' : 'visibility' }}</span>
                     </button>
                   </div>
                 </div>
@@ -1606,10 +1606,32 @@ reviewedCount() {
     deleteCurrentApiKey() {
       const currentService = this.translationService;
       const serviceName = this.availableServices.find(s => s.id === currentService)?.name || currentService;
-      this.serviceKeys = {
-        ...this.serviceKeys,
-        [currentService]: '',
-      };
+
+      // 1. Force update Vue reactive state
+      const updatedKeys = { ...(this.serviceKeys || {}) };
+      delete updatedKeys[currentService];
+      updatedKeys[currentService] = '';
+      this.serviceKeys = updatedKeys;
+
+      // 2. Directly clear DOM input node in case of browser/password manager autofill retention
+      if (this.$refs.apiKeyInput) {
+        this.$refs.apiKeyInput.value = '';
+        this.$refs.apiKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      // 3. Immediately clean up localStorage
+      try {
+        const raw = localStorage.getItem('sourceTranslationState');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          delete parsed.serviceInput;
+          if (parsed.serviceKeys) {
+            delete parsed.serviceKeys[currentService];
+          }
+          localStorage.setItem('sourceTranslationState', JSON.stringify(parsed));
+        }
+      } catch (e) {}
+
       this.saveState();
       this.showToast(`Saved API key for ${serviceName} deleted from storage.`, 'info');
     },
