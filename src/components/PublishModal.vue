@@ -116,9 +116,22 @@
             </div>
 
             <!-- Error Banner -->
-            <div v-if="errorMessage" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
-              <span class="material-icons-round text-base">error_outline</span>
-              <span>{{ errorMessage }}</span>
+            <div v-if="errorMessage" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex flex-col gap-2">
+              <div class="flex items-start gap-2">
+                <span class="material-icons-round text-base shrink-0 mt-0.5">error_outline</span>
+                <span class="flex-1 leading-relaxed">{{ errorMessage }}</span>
+              </div>
+              <div v-if="isSessionExpired" class="pt-2 border-t border-rose-500/20 flex items-center justify-between">
+                <span class="text-[11px] opacity-90">Your draft translation is saved and won't be lost.</span>
+                <button
+                  type="button"
+                  @click="relogin"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium text-xs transition-colors cursor-pointer shadow-sm"
+                >
+                  <span class="material-icons-round text-sm">login</span>
+                  <span>Log In Again</span>
+                </button>
+              </div>
             </div>
 
             <!-- Action Buttons -->
@@ -184,9 +197,22 @@
             </div>
 
             <!-- Error Banner -->
-            <div v-if="errorMessage" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
-              <span class="material-icons-round text-base">error_outline</span>
-              <span>{{ errorMessage }}</span>
+            <div v-if="errorMessage" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex flex-col gap-2">
+              <div class="flex items-start gap-2">
+                <span class="material-icons-round text-base shrink-0 mt-0.5">error_outline</span>
+                <span class="flex-1 leading-relaxed">{{ errorMessage }}</span>
+              </div>
+              <div v-if="isSessionExpired" class="pt-2 border-t border-rose-500/20 flex items-center justify-between">
+                <span class="text-[11px] opacity-90">Your draft translation is saved and won't be lost.</span>
+                <button
+                  type="button"
+                  @click="relogin"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium text-xs transition-colors cursor-pointer shadow-sm"
+                >
+                  <span class="material-icons-round text-sm">login</span>
+                  <span>Log In Again</span>
+                </button>
+              </div>
             </div>
 
             <!-- Destination Selection Header -->
@@ -380,6 +406,7 @@ export default {
       publishSuccess: false,
       publishedUrl: '',
       errorMessage: '',
+      isSessionExpired: false,
       titleChecking: false,
       pageExists: null,
     };
@@ -416,6 +443,7 @@ export default {
         this.selectedDest = null;
         this.publishSuccess = false;
         this.errorMessage = '';
+        this.isSessionExpired = false;
         if (this.targetTitle.trim()) {
           this.checkPageExistence(this.targetTitle.trim());
         }
@@ -524,11 +552,22 @@ export default {
         }
       } catch (err) {
         console.error('Publish error:', err);
-        this.errorMessage = err.response?.data?.message || err.message || 'An error occurred during publishing.';
+        const data = err.response?.data;
+        if (err.response?.status === 401 || data?.sessionExpired) {
+          this.isSessionExpired = true;
+          this.errorMessage = data?.message || 'Your Wikimedia session has expired. Please log in again.';
+          this.$emit('session-expired');
+        } else {
+          this.errorMessage = data?.message || err.message || 'An error occurred during publishing.';
+        }
       } finally {
         this.isPublishing = false;
         this.publishingDest = null;
       }
+    },
+
+    relogin() {
+      window.location.href = '/auth/login';
     },
   },
 };

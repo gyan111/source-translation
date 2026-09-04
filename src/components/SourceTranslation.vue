@@ -870,6 +870,7 @@
       :mtEngine="translationService"
       @close="showPublishModal = false"
       @published="handleArticlePublished"
+      @session-expired="$emit('session-expired')"
     />
   </div>
 </template>

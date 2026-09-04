@@ -8,7 +8,7 @@
       @open-analytics="showAdminStats = true"
     />
     <main class="flex-1 w-full">
-      <SourceTranslation :user="user" />
+      <SourceTranslation :user="user" @session-expired="handleSessionExpired" />
     </main>
     <FooterBar />
 
@@ -98,6 +98,12 @@ export default {
       if (document.visibilityState === 'visible') {
         this.fetchUser();
       }
+    },
+    handleSessionExpired() {
+      this.user = null;
+      try {
+        localStorage.removeItem('wiki_user');
+      } catch (e) {}
     },
   },
   created() {

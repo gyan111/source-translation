@@ -1,16 +1,10 @@
 import express from 'express';
 import axios from 'axios';
+import { getOAuthConfig, validateOrRefreshToken } from '../services/oauthService.js';
+import { isVerifiedUser } from '../config/verifiedUsers.js';
+import { isAdminUser } from '../config/adminUsers.js';
 
 const router = express.Router();
-
-const getOAuthConfig = () => ({
-  clientId: process.env.WIKI_CLIENT_ID || process.env.OAUTH_CONSUMER_KEY || '',
-  clientSecret: process.env.WIKI_CLIENT_SECRET || process.env.OAUTH_CONSUMER_SECRET || '',
-  authorizationUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/authorize',
-  tokenUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/access_token',
-  profileUrl: 'https://meta.wikimedia.org/w/rest.php/oauth2/resource/profile',
-  callbackUrl: process.env.WIKI_CALLBACK_URL || process.env.OAUTH_CALLBACK_URL || 'http://localhost:8000/callback',
-});
 
 // Login - redirect to Wikimedia authorization
 router.get('/login', (req, res) => {
@@ -104,11 +98,15 @@ router.get('/callback', async (req, res) => {
 
     const profile = profileResponse.data;
 
-    // Store user in session
+    // Store user in session with refresh token and expiration timestamp
     req.session.user = {
       username: profile.username || profile.sub,
       id: profile.sub,
       accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token || null,
+      expiresAt: tokenData.expires_in
+        ? Date.now() + tokenData.expires_in * 1000
+        : Date.now() + 3600 * 1000,
     };
 
     if (req.session.returnTo) {
@@ -141,16 +139,17 @@ router.post('/logout', (req, res) => {
   });
 });
 
-import { isVerifiedUser } from '../config/verifiedUsers.js';
-import { isAdminUser } from '../config/adminUsers.js';
-
-// Get current user
-router.get('/user', (req, res) => {
+// Get current user (validates/refreshes Wikimedia token)
+router.get('/user', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
   if (req.session && req.session.user) {
+    const validToken = await validateOrRefreshToken(req);
+    if (!validToken) {
+      return res.json(null);
+    }
     const username = req.session.user.username;
     res.json({
       username: username,

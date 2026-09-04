@@ -1,14 +1,17 @@
 import express from 'express';
 import { isVerifiedUser } from '../config/verifiedUsers.js';
 import { analyticsService } from '../services/analyticsService.js';
+import { validateOrRefreshToken, refreshWikimediaToken } from '../services/oauthService.js';
 
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-  if (!req.session || !req.session.user || !req.session.user.accessToken) {
+  let accessToken = await validateOrRefreshToken(req);
+  if (!accessToken || !req.session || !req.session.user) {
     return res.status(401).json({
       error: 'Unauthorized',
-      message: 'You must be logged in to publish articles.',
+      message: 'Your Wikimedia session has expired. Please log in again.',
+      sessionExpired: true,
     });
   }
 
@@ -32,23 +35,47 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const accessToken = req.session.user.accessToken;
-
     // 1. Fetch CSRF Token
     const userAgent = 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu; source-translation-app)';
     const tokenUrl = `https://${language}.wikipedia.org/w/api.php?action=query&meta=tokens&type=csrf&format=json`;
-    const tokenResponse = await fetch(tokenUrl, {
+    let tokenResponse = await fetch(tokenUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'User-Agent': userAgent,
       },
     });
     
-    const tokenData = await tokenResponse.json();
-    const csrfToken = tokenData?.query?.tokens?.csrftoken;
+    let tokenData = await tokenResponse.json();
+    let csrfToken = tokenData?.query?.tokens?.csrftoken;
+
+    // If CSRF token is missing or anonymous dummy token (+\), attempt token refresh and retry
+    if (!csrfToken || csrfToken === '+\\') {
+      if (req.session.user.refreshToken) {
+        const refreshedToken = await refreshWikimediaToken(req.session.user);
+        if (refreshedToken) {
+          accessToken = refreshedToken;
+          await new Promise((resolve) => req.session.save(resolve));
+
+          tokenResponse = await fetch(tokenUrl, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'User-Agent': userAgent,
+            },
+          });
+          tokenData = await tokenResponse.json();
+          csrfToken = tokenData?.query?.tokens?.csrftoken;
+        }
+      }
+    }
 
     if (!csrfToken || csrfToken === '+\\') {
-      throw new Error('Failed to obtain a valid CSRF token. Please log in again.');
+      delete req.session.user;
+      await new Promise((resolve) => req.session.save(resolve));
+      return res.status(401).json({
+        error: 'Session Expired',
+        message: 'Your Wikimedia session has expired. Please log in again.',
+        sessionExpired: true,
+      });
     }
 
     // 2. Format edit summary with source attribution (CC BY-SA compliance)
@@ -91,8 +118,14 @@ router.post('/', async (req, res) => {
           'Please verify your OAuth consumer grants on Meta-Wiki, or publish to your User Sandbox (Draft) first.'
         );
       }
-      if (errCode === 'assertuserfailed') {
-        throw new Error('OAuth session expired. Please log out and log in again.');
+      if (errCode === 'assertuserfailed' || errCode === 'badtoken') {
+        delete req.session.user;
+        await new Promise((resolve) => req.session.save(resolve));
+        return res.status(401).json({
+          error: 'Session Expired',
+          message: 'Your Wikimedia session has expired. Please log in again.',
+          sessionExpired: true,
+        });
       }
       throw new Error(errInfo);
     }
