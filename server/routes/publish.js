@@ -79,9 +79,9 @@ router.post('/', async (req, res) => {
     }
 
     // 2. Format edit summary with source attribution (CC BY-SA compliance)
-    let editSummary = 'Created via Source Translation Tool (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)';
+    let editSummary = 'Created via Source Translation Tool (https://source-translation.toolforge.org)';
     if (sourceTitle && sourceLanguage) {
-      editSummary = `Translated from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu)`;
+      editSummary = `Translated from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`;
     }
 
     // 3. Publish Edit with OAuth Bearer Token & User-Agent
