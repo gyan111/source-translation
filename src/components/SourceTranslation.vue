@@ -885,6 +885,7 @@ import axios from 'axios';
 import debounce from 'lodash/debounce';
 import { isRtlLanguage } from '../i18n.js';
 import { calculateModificationPercent } from '../utils/diffHelper.js';
+import { splitWikitextIntoParagraphs } from '../utils/wikitextSplitter.js';
 
 export default {
   name: 'SourceTranslation',
@@ -1846,17 +1847,7 @@ reviewedCount() {
     },
 
     splitIntoParagraphs(wikitext) {
-      if (!wikitext || typeof wikitext !== 'string') {
-        this.paragraphs = [];
-        return;
-      }
-      // Ensure headings have clean section boundaries
-      let cleaned = wikitext.replace(/([^\n])\n([ \t]*={2,}[^\n=]+={2,})/g, '$1\n\n$2');
-      cleaned = cleaned.replace(/(={2,}[^\n=]+={2,}[ \t]*)\n([^\n=])/g, '$1\n\n$2');
-      // Ensure multi-line template endings (e.g. Infobox closing }}) followed directly by prose or templates have clean section breaks
-      cleaned = cleaned.replace(/(\n\}\}[ \t]*)\n([^\n])/g, '$1\n\n$2');
-
-      const parts = cleaned.split(/\n\n+/).filter(p => p.trim() !== '');
+      const parts = splitWikitextIntoParagraphs(wikitext);
       this.paragraphs = parts.map(source => ({
         source: source.trim(),
         translation: '',
