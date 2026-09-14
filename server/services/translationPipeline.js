@@ -27,7 +27,7 @@ import {
   translateTemplateNames,
   translateCategories,
 } from './wikidataService.js';
-import { translateText, translateTexts } from './translationService.js';
+import { translateText, translateTexts, isLlmService } from './translationService.js';
 
 /**
  * Translate a wikitext string end-to-end.
@@ -121,6 +121,44 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
     for (const t of templateNames) translatedTemplates[t] = t;
   }
   stats.timingMs.templates = Date.now() - stepStart;
+
+  // Step 5b: For modern LLMs (Gemini, Groq, OpenAI), translate full wikitext directly to preserve context, syntax, and grammar
+  if (isLlmService(service)) {
+    if (onProgress) onProgress('text', 60);
+    stepStart = Date.now();
+
+    // Pre-substitute exact Wikidata sitelinks if available on target wiki
+    let preparedWikitext = wikitext;
+    for (const [orig, translated] of Object.entries(translatedLinks)) {
+      if (translated && translated !== orig) {
+        const escaped = orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        preparedWikitext = preparedWikitext.replace(new RegExp(`\\[\\[${escaped}(\\|[^\\]]+)?\\]\\]`, 'g'), (m, display) => {
+          return display ? `[[${translated}${display}]]` : `[[${translated}|${orig}]]`;
+        });
+      }
+    }
+
+    // Pre-substitute exact template name translations if available
+    for (const [origTpl, transTpl] of Object.entries(translatedTemplates)) {
+      if (transTpl && transTpl !== origTpl) {
+        const escaped = origTpl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        preparedWikitext = preparedWikitext.replace(new RegExp(`\\{\\{\\s*${escaped}\\s*([\\|\\}])`, 'g'), `{{${transTpl}$1`);
+      }
+    }
+
+    try {
+      const translatedWikitext = await translateText(preparedWikitext, fromLang, toLang, service, options);
+      stats.timingMs.textTranslation = Date.now() - stepStart;
+      stats.timingMs.total = Date.now() - startTime;
+      if (onProgress) onProgress('done', 100);
+
+      console.log(`[Pipeline/LLM] Completed in ${stats.timingMs.total}ms — links: ${stats.linksTranslated}/${stats.linksFound}, templates: ${stats.templatesTranslated}/${stats.templatesFound}`);
+      return { translatedText: translatedWikitext, stats };
+    } catch (llmErr) {
+      console.warn(`[Pipeline/LLM] Direct LLM translation failed: ${llmErr.message}. Falling back to segmented pipeline.`);
+      stats.errors.push(`LLM direct translation fallback: ${llmErr.message}`);
+    }
+  }
 
   // Step 6: Translate text and heading segments via translation service
   if (onProgress) onProgress('text', 50);

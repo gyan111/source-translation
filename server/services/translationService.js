@@ -497,6 +497,107 @@ async function microsoftTranslate(text, fromLang, toLang, options) {
   }
 }
 
+// ──────────────────────────── LLM Language & Script Specifications ────────────────────────────
+
+export const LANGUAGE_SPECS = {
+  sat: {
+    name: 'Santali',
+    script: 'Ol Chiki (ᱚᱞ ᱪᱤᱠᱤ)',
+    extra: "Write strictly in Ol Chiki script (U+1C50–U+1C7F). For 'starring' or 'acting', use Santali 'ᱠᱟᱹᱢᱤ ᱟᱠᱟᱫᱟ ᱠᱚ' or 'ᱯᱟᱴ ᱟᱠᱟᱫᱟ ᱠᱚ' (do NOT use Bengali 'অভিনয়'). Use Ol Chiki mucad '᱾' for sentence ends."
+  },
+  gu: { name: 'Gujarati', script: 'Gujarati (ગુજરાતી)' },
+  hi: { name: 'Hindi', script: 'Devanagari (हिन्दी)' },
+  bn: { name: 'Bengali', script: 'Bengali (বাংলা)' },
+  or: { name: 'Odia', script: 'Odia (ଓଡ଼ᱤଆ)' },
+  pa: { name: 'Punjabi', script: 'Gurmukhi (ਪੰਜਾਬੀ)' },
+  pnb: { name: 'Punjabi (Shahmukhi)', script: 'Shahmukhi (پنجابی)' },
+  ta: { name: 'Tamil', script: 'Tamil (தமிழ்)' },
+  te: { name: 'Telugu', script: 'Telugu (తెలుగు)' },
+  kn: { name: 'Kannada', script: 'Kannada (ಕನ್ನಡ)' },
+  ml: { name: 'Malayalam', script: 'Malayalam (മലയാളം)' },
+  mr: { name: 'Marathi', script: 'Devanagari (मराठी)' },
+  as: { name: 'Assamese', script: 'Assamese (অসমীয়া)' },
+  ur: { name: 'Urdu', script: 'Urdu (اردو)' },
+  sa: { name: 'Sanskrit', script: 'Devanagari (संस्कृतम्)' },
+  ne: { name: 'Nepali', script: 'Devanagari (नेपाली)' },
+  bho: { name: 'Bhojpuri', script: 'Devanagari (भोजपुरी)' },
+  mai: { name: 'Maithili', script: 'Devanagari (मैथिली)' },
+  doi: { name: 'Dogri', script: 'Devanagari (डोगरी)' },
+  ks: { name: 'Kashmiri', script: 'Arabic/Nastaliq (كٲشُر)' },
+  sd: { name: 'Sindhi', script: 'Sindhi (سنڌي)' },
+  si: { name: 'Sinhala', script: 'Sinhala (සිංහල)' },
+  brx: { name: 'Bodo', script: 'Devanagari (बड़ो)' },
+  gom: { name: 'Goan Konkani', script: 'Devanagari (कोंकणी)' },
+  mni: { name: 'Meitei', script: 'Meitei Mayek (ꯃৈতৈ)' },
+  en: { name: 'English' },
+  fr: { name: 'French' },
+  de: { name: 'German' },
+  es: { name: 'Spanish' },
+  it: { name: 'Italian' },
+  pt: { name: 'Portuguese' },
+  ru: { name: 'Russian' },
+  ar: { name: 'Arabic' },
+  zh: { name: 'Chinese' },
+  ja: { name: 'Japanese' },
+  ko: { name: 'Korean' },
+};
+
+/**
+ * Builds a clear, culturally accurate system prompt for LLMs (Gemini, Groq, OpenAI).
+ */
+export function buildLlmSystemInstruction(fromLang, toLang) {
+  const fromSpec = LANGUAGE_SPECS[fromLang] || { name: fromLang };
+  const toSpec = LANGUAGE_SPECS[toLang] || { name: toLang };
+
+  const fromDesc = fromSpec.script ? `${fromSpec.name} (${fromSpec.script})` : fromSpec.name;
+  const toDesc = toSpec.script ? `${toSpec.name} (${toSpec.script})` : toSpec.name;
+
+  let prompt = `You are an expert Wikipedia translator. Translate the provided text accurately from ${fromDesc} to ${toDesc}.\n`;
+  prompt += `IMPORTANT RULES:\n`;
+  prompt += `- Translate naturally into fluent, grammatically correct ${toSpec.name}.\n`;
+  prompt += `- Preserve ALL wiki formatting: bold ('''), italic (''), headings (==), lists (*, #), template calls ({{...}}), and citations (<ref>...</ref>) exactly in place.\n`;
+  prompt += `- For [[wikilinks]], preserve link syntax [[Target|Display]]. If the target has no established translated name, keep the target and translate display text if appropriate.\n`;
+  if (toSpec.extra) {
+    prompt += `- ${toSpec.extra}\n`;
+  }
+  prompt += `- Return ONLY the translated wikitext without greetings, notes, explanations, or enclosing markdown code fences.`;
+  return prompt;
+}
+
+/**
+ * Post-processes LLM output to eliminate accidental markdown wrappers and Unicode confusables.
+ */
+export function sanitizeTranslationOutput(text, toLang) {
+  if (!text || typeof text !== 'string') return text;
+  let res = text.trim();
+
+  // Strip accidental enclosing markdown code fences like ```wikitext ... ```
+  if (res.startsWith('```') && res.endsWith('```')) {
+    res = res.replace(/^```[a-zA-Z0-9_-]*\n?/, '').replace(/\n?```$/, '').trim();
+  }
+
+  if (toLang === 'sat') {
+    res = res
+      .replace(/\u0E07/g, 'ᱜ') // Thai ng -> Ol Chiki ga
+      .replace(/\u10D0\u10DC/g, 'ᱟᱱ') // Georgian an -> Ol Chiki an
+      .replace(/\u063A\u0647/g, 'ᱣᱟ') // Arabic -> Ol Chiki wa
+      .replace(/\u05E7/g, 'ᱠ') // Hebrew qof -> Ol Chiki la
+      .replace(/অভিনয়/g, 'ᱯᱟᱴ')
+      .replace(/উপন্যাস/g, 'ᱜᱟᱢᱟᱢ')
+      .replace(/হলো/g, 'ᱠᱟᱱᱟ')
+      .replace(/[।]/g, '᱾');
+  }
+
+  return res;
+}
+
+/**
+ * Checks if a service is a modern LLM capable of translating full wikitext with context.
+ */
+export function isLlmService(service) {
+  return ['gemini', 'groq', 'openai', 'custom_openai'].includes(service);
+}
+
 /**
  * OpenAI GPT translation with wiki-aware system prompt.
  */
@@ -507,35 +608,15 @@ async function openaiTranslate(text, fromLang, toLang, options) {
   const model = options.model || 'gpt-4o-mini';
   const endpoint = options.apiEndpoint || 'https://api.openai.com/v1/chat/completions';
 
-  const langNames = {
-    en: 'English', hi: 'Hindi', bn: 'Bengali', ta: 'Tamil', te: 'Telugu',
-    mr: 'Marathi', gu: 'Gujarati', kn: 'Kannada', ml: 'Malayalam', pa: 'Punjabi',
-    or: 'Odia', as: 'Assamese', ur: 'Urdu', ne: 'Nepali', sa: 'Sanskrit',
-    si: 'Sinhala', ar: 'Arabic', de: 'German', es: 'Spanish', fr: 'French',
-    ja: 'Japanese', pt: 'Portuguese', ru: 'Russian', zh: 'Chinese',
-    bho: 'Bhojpuri', doi: 'Dogri', gom: 'Goan Konkani', ks: 'Kashmiri',
-    mai: 'Maithili', mni: 'Meitei', sd: 'Sindhi', sat: 'Santali', new: 'Newari',
-  };
-
-  const fromName = langNames[fromLang] || fromLang;
-  const toName = langNames[toLang] || toLang;
+  const systemContent = buildLlmSystemInstruction(fromLang, toLang);
 
   const response = await axios.post(endpoint, {
     model,
     messages: [
-      {
-        role: 'system',
-        content: `You are a professional translator specializing in Wikipedia content. Translate the following text from ${fromName} to ${toName}. IMPORTANT RULES:
-- Preserve ALL wiki markup syntax exactly (headings ==, bold ''', italic '', lists *, #, etc.)
-- Do NOT translate or modify any placeholder tokens (like \\x00TEMPLATE_0\\x00 or \\x00LINK_0\\x00)
-- Maintain paragraph structure and formatting
-- Translate naturally and accurately, using proper terminology
-- For technical or domain-specific terms, use the most widely accepted ${toName} translation
-- Return ONLY the translated text, no explanations or notes`,
-      },
+      { role: 'system', content: systemContent },
       { role: 'user', content: text },
     ],
-    temperature: 0.3,
+    temperature: 0.2,
     max_tokens: Math.min(text.length * 4, 16384),
   }, {
     headers: {
@@ -547,7 +628,7 @@ async function openaiTranslate(text, fromLang, toLang, options) {
 
   const translated = response.data?.choices?.[0]?.message?.content;
   if (!translated) throw new Error('Empty response from OpenAI');
-  return translated.trim();
+  return sanitizeTranslationOutput(translated, toLang);
 }
 
 /**
@@ -666,9 +747,7 @@ async function customOpenaiTranslate(text, fromLang, toLang, options) {
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  const systemPrompt = `You are an expert Wikipedia translator. Translate the provided text from ${fromLang} to ${toLang}.
-Preserve any wiki formatting, numbers, markup, or special symbols.
-Return ONLY the translated text without explanations, greetings, quotes, or markdown backticks.`;
+  const systemPrompt = buildLlmSystemInstruction(fromLang, toLang);
 
   const payload = {
     model,
@@ -686,7 +765,7 @@ Return ONLY the translated text without explanations, greetings, quotes, or mark
 
   const translated = response.data?.choices?.[0]?.message?.content;
   if (!translated) throw new Error('Empty response from custom AI provider');
-  return translated.trim();
+  return sanitizeTranslationOutput(translated, toLang);
 }
 
 /**
@@ -741,9 +820,7 @@ async function groqTranslate(text, fromLang, toLang, options) {
     'llama-3.3-70b-versatile',
   ].filter(Boolean);
 
-  const systemPrompt = `You are an expert Wikipedia translator. Translate the provided text from ${fromLang} to ${toLang}.
-Preserve all wiki formatting, [[wikilinks]], {{templates}}, numbers, and special symbols intact.
-Return ONLY the translated text without explanations, greetings, quotes, or markdown code fences.`;
+  const systemPrompt = buildLlmSystemInstruction(fromLang, toLang);
 
   let lastError = null;
   for (const model of candidateModels) {
@@ -766,7 +843,7 @@ Return ONLY the translated text without explanations, greetings, quotes, or mark
       });
 
       const translated = response.data?.choices?.[0]?.message?.content;
-      if (translated) return translated.trim();
+      if (translated) return sanitizeTranslationOutput(translated, toLang);
     } catch (err) {
       lastError = err;
       if (err.response?.status === 404 || err.response?.data?.error?.code === 'model_not_found') {
@@ -796,9 +873,7 @@ async function geminiTranslate(text, fromLang, toLang, options) {
     'gemini-3.6-flash',
   ].filter(Boolean);
 
-  const systemInstruction = `You are an expert Wikipedia translator. Translate the provided text from ${fromLang} to ${toLang}.
-Preserve all wiki formatting, [[wikilinks]], {{templates}}, <ref> footnotes, markup, numbers, and special symbols intact.
-Return ONLY the translated text without explanations, greetings, quotes, or markdown code fences.`;
+  const systemInstruction = buildLlmSystemInstruction(fromLang, toLang);
 
   let lastError = null;
   for (const model of candidateModels) {
@@ -824,7 +899,7 @@ Return ONLY the translated text without explanations, greetings, quotes, or mark
       });
 
       const translated = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (translated) return translated.trim();
+      if (translated) return sanitizeTranslationOutput(translated, toLang);
     } catch (err) {
       lastError = err;
       if (err.response?.status === 404) {
@@ -856,9 +931,8 @@ async function geminiBatchTranslate(texts, fromLang, toLang, options) {
     'gemini-3.6-flash',
   ].filter(Boolean);
 
-  const systemInstruction = `You are an expert Wikipedia translator. Translate each of the following text strings from ${fromLang} to ${toLang}.
-Preserve all wiki formatting, [[wikilinks]], {{templates}}, <ref> footnotes, markup, numbers, and special symbols intact.
-Return ONLY a valid JSON array of strings containing the translations in the exact same order as the input array.`;
+  const baseInstruction = buildLlmSystemInstruction(fromLang, toLang);
+  const systemInstruction = `${baseInstruction}\nTranslate each of the input array strings into the target language.\nReturn ONLY a valid JSON array of strings containing the translations in the exact same order as the input array.`;
 
   const prompt = `${systemInstruction}\n\nInput JSON:\n${JSON.stringify(texts)}`;
 
@@ -885,7 +959,8 @@ Return ONLY a valid JSON array of strings containing the translations in the exa
         if (Array.isArray(parsed) && parsed.length === texts.length) {
           const map = {};
           texts.forEach((orig, idx) => {
-            map[orig] = typeof parsed[idx] === 'string' ? parsed[idx].trim() : orig;
+            const rawVal = typeof parsed[idx] === 'string' ? parsed[idx].trim() : orig;
+            map[orig] = sanitizeTranslationOutput(rawVal, toLang);
           });
           return map;
         }
