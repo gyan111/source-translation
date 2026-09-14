@@ -134,20 +134,20 @@ export function getAvailableServices() {
       description: 'Free neural machine translation by Wikimedia. Best for Wikipedia content.' 
     },
     { 
-      id: 'gemini', 
-      name: 'Google Gemini AI', 
-      requiresKey: !hasServerGemini, 
-      description: hasServerGemini 
-        ? 'Google Gemini Flash AI with ultra-fast inference and high accuracy (Server key enabled).' 
-        : 'Google Gemini Flash AI. Free API key available at aistudio.google.com.' 
-    },
-    { 
       id: 'google', 
       name: 'Google Cloud Translation', 
       requiresKey: !hasServerGoogle, 
       description: hasServerGoogle 
         ? 'Official Google Cloud Translation v2 (Server key enabled).' 
         : 'Official Google Cloud Translation API v2. Requires Google Cloud API key.' 
+    },
+    { 
+      id: 'gemini', 
+      name: 'Google Gemini AI', 
+      requiresKey: !hasServerGemini, 
+      description: hasServerGemini 
+        ? 'Google Gemini Flash AI with ultra-fast inference and high accuracy (Server key enabled).' 
+        : 'Google Gemini Flash AI. Free API key available at aistudio.google.com.' 
     },
     { 
       id: 'groq', 

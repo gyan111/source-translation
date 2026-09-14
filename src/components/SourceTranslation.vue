@@ -597,8 +597,8 @@
                 </label>
                 <select v-model="translationService" class="select-field font-medium">
                   <option value="mint">Wikimedia MinT (100% Free, Built-in)</option>
-                  <option value="gemini">Google Gemini AI (Fast Flash, Free)</option>
                   <option value="google">Google Cloud Translation (Free via Server Key)</option>
+                  <option value="gemini">Google Gemini AI (Fast Flash, Free)</option>
                   <option value="groq">Groq Cloud AI (Ultra-fast)</option>
                   <option value="deepl">DeepL Translator (Free 500k chars/mo or Pro)</option>
                   <option value="openai">OpenAI GPT (GPT-4o, GPT-4o-mini)</option>
