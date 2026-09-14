@@ -13,6 +13,7 @@ describe('translationService', () => {
     const services = getAvailableServices();
     const serviceIds = services.map(s => s.id);
     expect(serviceIds).toContain('mint');
+    expect(serviceIds).toContain('gemini');
     expect(serviceIds).toContain('groq');
     expect(serviceIds).toContain('deepl');
     expect(serviceIds).toContain('google');
@@ -73,6 +74,32 @@ describe('translationService', () => {
       apiKey: 'gsk_123',
     });
     expect(result).toBe('Hola mundo');
+  });
+
+  it('translates via Google Gemini adapter', async () => {
+    axios.post.mockResolvedValueOnce({
+      data: {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Hola mundo' }],
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await translateText('Hello world', 'en', 'es', 'gemini', { apiKey: 'test-gemini-key' });
+    expect(result).toBe('Hola mundo');
+    expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining('generativelanguage.googleapis.com'),
+      expect.objectContaining({
+        contents: expect.any(Array),
+      }),
+      expect.objectContaining({
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
   });
 
   it('translates via Custom REST MT endpoint adapter', async () => {

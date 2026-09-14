@@ -597,6 +597,7 @@
                 </label>
                 <select v-model="translationService" class="select-field font-medium">
                   <option value="mint">Wikimedia MinT (100% Free, Built-in)</option>
+                  <option value="gemini">Google Gemini AI (Fast Flash, Free)</option>
                   <option value="google">Google Cloud Translation (Free via Server Key)</option>
                   <option value="groq">Groq Cloud AI (Ultra-fast)</option>
                   <option value="deepl">DeepL Translator (Free 500k chars/mo or Pro)</option>
@@ -1057,6 +1058,7 @@ export default {
     currentServiceDisplayName() {
       const map = {
         mint: 'Wikimedia MinT (Free)',
+        gemini: 'Google Gemini AI',
         google: 'Google Cloud Translation',
         groq: 'Groq Cloud AI',
         deepl: 'DeepL Translator',
@@ -1082,6 +1084,21 @@ export default {
           ],
           link: 'https://www.mediawiki.org/wiki/MinT',
           linkText: 'Learn about Wikimedia MinT',
+        };
+      }
+      if (this.translationService === 'gemini') {
+        return {
+          title: 'Google Gemini AI',
+          badge: 'Fast Flash Models (Server Key Active)',
+          badgeColor: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+          summary: 'State-of-the-art multilingual neural translation powered by lightweight Google Gemini Flash models.',
+          steps: [
+            'Server key is active and free to use up to daily quotas.',
+            'To use your own key: visit Google AI Studio at aistudio.google.com.',
+            'Click "Create API Key", copy your key, and paste it below.',
+          ],
+          link: 'https://aistudio.google.com/app/apikey',
+          linkText: 'Get Google AI Studio Key',
         };
       }
       if (this.translationService === 'google') {
@@ -1270,7 +1287,7 @@ export default {
       return null;
     },
     showApiKeyInput() {
-      return ['groq', 'google', 'microsoft', 'openai', 'deepl', 'custom_openai', 'libretranslate', 'custom_rest'].includes(this.translationService);
+      return ['gemini', 'groq', 'google', 'microsoft', 'openai', 'deepl', 'custom_openai', 'libretranslate', 'custom_rest'].includes(this.translationService);
     },
     showEndpointInput() {
       return ['openai', 'custom_openai', 'libretranslate', 'custom_rest'].includes(this.translationService);
@@ -1279,6 +1296,7 @@ export default {
       return ['openai', 'custom_openai'].includes(this.translationService);
     },
     apiKeyPlaceholder() {
+      if (this.translationService === 'gemini') return 'AIzaSy... (optional if server key active)';
       if (this.translationService === 'groq') return 'gsk_... (optional if logged in)';
       if (this.translationService === 'google') return 'AIzaSy... (optional if logged in)';
       if (this.translationService === 'deepl') return 'DeepL API key (...:fx for free)';
@@ -1373,6 +1391,9 @@ reviewedCount() {
       return false;
     },
     serverQuotaNotice() {
+      if (this.translationService === 'gemini') {
+        return '⚡ Free via server key · Or enter your own key for dedicated quota';
+      }
       if (this.translationService === 'google') {
         return '⚡ Free via server key (capped daily) · Or enter your own key for dedicated quota';
       }

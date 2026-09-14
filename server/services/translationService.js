@@ -54,23 +54,45 @@ export async function translateTexts(texts, fromLang, toLang, service, options =
   const uniqueTrimmed = [...new Set(texts.filter(t => t && typeof t === 'string' && t.trim()).map(t => t.trim()))];
   const translatedMap = {};
 
-  // Translate concurrently with concurrency limit
-  const CONCURRENCY = 3;
-  for (let i = 0; i < uniqueTrimmed.length; i += CONCURRENCY) {
-    const batch = uniqueTrimmed.slice(i, i + CONCURRENCY);
-    const translations = await Promise.all(
-      batch.map(async (trimmed) => {
-        try {
-          const translated = await translateText(trimmed, fromLang, toLang, service, options);
-          return { trimmed, translated: translated || trimmed };
-        } catch (err) {
-          console.error(`Translation failed for chunk (${trimmed.length} chars): ${err.message}`);
-          return { trimmed, translated: trimmed };
+  // Translate using batch adapter if available to minimize API calls and avoid 429 rate limits
+  if (BATCH_ADAPTERS[service] && uniqueTrimmed.length > 1) {
+    const BATCH_SIZE = 25;
+    for (let i = 0; i < uniqueTrimmed.length; i += BATCH_SIZE) {
+      const batch = uniqueTrimmed.slice(i, i + BATCH_SIZE);
+      try {
+        const batchResults = await BATCH_ADAPTERS[service](batch, fromLang, toLang, options);
+        Object.assign(translatedMap, batchResults);
+      } catch (err) {
+        console.warn(`Batch translation failed for ${service}: ${err.message}. Falling back to single translations.`);
+        for (const trimmed of batch) {
+          try {
+            const translated = await translateText(trimmed, fromLang, toLang, service, options);
+            translatedMap[trimmed] = translated || trimmed;
+          } catch (singleErr) {
+            translatedMap[trimmed] = trimmed;
+          }
         }
-      })
-    );
-    for (const { trimmed, translated } of translations) {
-      translatedMap[trimmed] = translated;
+      }
+    }
+  } else {
+    // Translate concurrently with concurrency limit
+    const CONCURRENCY = 3;
+    for (let i = 0; i < uniqueTrimmed.length; i += CONCURRENCY) {
+      const batch = uniqueTrimmed.slice(i, i + CONCURRENCY);
+      const translations = await Promise.all(
+        batch.map(async (trimmed) => {
+          try {
+            const translated = await translateText(trimmed, fromLang, toLang, service, options);
+            return { trimmed, translated: translated || trimmed };
+          } catch (err) {
+            console.error(`Translation failed for chunk (${trimmed.length} chars): ${err.message}`);
+            return { trimmed, translated: trimmed };
+          }
+        })
+      );
+      for (const { trimmed, translated } of translations) {
+        translatedMap[trimmed] = translated;
+      }
     }
   }
 
@@ -102,6 +124,7 @@ export async function translateTexts(texts, fromLang, toLang, service, options =
 export function getAvailableServices() {
   const hasServerGoogle = Boolean(process.env.GOOGLE_TRANSLATE_API_KEY);
   const hasServerGroq = Boolean(process.env.GROQ_API_KEY);
+  const hasServerGemini = Boolean(process.env.GEMINI_API_KEY);
 
   return [
     { 
@@ -109,6 +132,14 @@ export function getAvailableServices() {
       name: 'Wikimedia MinT', 
       requiresKey: false, 
       description: 'Free neural machine translation by Wikimedia. Best for Wikipedia content.' 
+    },
+    { 
+      id: 'gemini', 
+      name: 'Google Gemini AI', 
+      requiresKey: !hasServerGemini, 
+      description: hasServerGemini 
+        ? 'Google Gemini Flash AI with ultra-fast inference and high accuracy (Server key enabled).' 
+        : 'Google Gemini Flash AI. Free API key available at aistudio.google.com.' 
     },
     { 
       id: 'google', 
@@ -759,10 +790,10 @@ async function geminiTranslate(text, fromLang, toLang, options) {
   const candidateModels = [
     options.model,
     process.env.GEMINI_MODEL,
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
     'gemini-3.6-flash',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
   ].filter(Boolean);
 
   const systemInstruction = `You are an expert Wikipedia translator. Translate the provided text from ${fromLang} to ${toLang}.
@@ -805,6 +836,74 @@ Return ONLY the translated text without explanations, greetings, quotes, or mark
 
   throw lastError || new Error('Empty response from Google Gemini AI');
 }
+
+/**
+ * Google Gemini AI Batch Translation.
+ * Translates an array of short strings in a single prompt using structured JSON response.
+ * Minimizes API calls to prevent 429 rate limit errors on the free tier.
+ */
+async function geminiBatchTranslate(texts, fromLang, toLang, options) {
+  if (!texts.length) return {};
+  const apiKey = options.apiKey || process.env.GEMINI_API_KEY || '';
+  if (!apiKey) throw new Error('Google Gemini API key is required.');
+
+  const candidateModels = [
+    options.model,
+    process.env.GEMINI_MODEL,
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.6-flash',
+  ].filter(Boolean);
+
+  const systemInstruction = `You are an expert Wikipedia translator. Translate each of the following text strings from ${fromLang} to ${toLang}.
+Preserve all wiki formatting, [[wikilinks]], {{templates}}, <ref> footnotes, markup, numbers, and special symbols intact.
+Return ONLY a valid JSON array of strings containing the translations in the exact same order as the input array.`;
+
+  const prompt = `${systemInstruction}\n\nInput JSON:\n${JSON.stringify(texts)}`;
+
+  let lastError = null;
+  for (const model of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: 'application/json',
+        },
+      };
+
+      const response = await axios.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: REQUEST_TIMEOUT * 2,
+      });
+
+      const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length === texts.length) {
+          const map = {};
+          texts.forEach((orig, idx) => {
+            map[orig] = typeof parsed[idx] === 'string' ? parsed[idx].trim() : orig;
+          });
+          return map;
+        }
+      }
+    } catch (err) {
+      lastError = err;
+      if (err.response?.status === 404) continue;
+      throw err;
+    }
+  }
+
+  throw lastError || new Error('Empty response from Google Gemini AI batch translate');
+}
+
+// Batch adapter registry for providers supporting native array translation
+const BATCH_ADAPTERS = {
+  gemini: geminiBatchTranslate,
+};
 
 // Adapter registry
 const ADAPTERS = {
