@@ -344,20 +344,64 @@
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Source Wikitext</span>
-            <button
-              v-if="wikitextInput"
-              @click="wikitextInput = ''; wikitextTranslated = '';"
-              class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
-            >
-              Clear
-            </button>
+            <div class="flex items-center gap-1.5">
+              <div v-if="wikitextInput" class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+                <button
+                  type="button"
+                  @click="wikitextSourceView = 'text'"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    wikitextSourceView === 'text'
+                      ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="View raw wikitext"
+                >
+                  <span class="material-icons-round text-[12px]">code</span>
+                  <span>Wikitext</span>
+                </button>
+                <button
+                  type="button"
+                  @click="toggleWikitextSourcePreview"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    wikitextSourceView === 'preview'
+                      ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="Preview source wikitext"
+                >
+                  <span class="material-icons-round text-[12px]">visibility</span>
+                  Preview
+                </button>
+              </div>
+              <button
+                v-if="wikitextInput"
+                @click="wikitextInput = ''; wikitextTranslated = ''; wikitextSourceView = 'text';"
+                class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
           </div>
           <textarea
+            v-if="wikitextSourceView === 'text'"
             v-model="wikitextInput"
             :dir="isSourceRtl ? 'rtl' : 'ltr'"
             class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[260px] bg-slate-50/70 dark:bg-zinc-950/60 resize-y"
             placeholder="Paste raw wikitext with headings, links, templates, and categories here..."
           ></textarea>
+          <div
+            v-else
+            :dir="isSourceRtl ? 'rtl' : 'ltr'"
+            class="wiki-preview flex-1 min-h-[260px] p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-white/[0.08] text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed overflow-y-auto max-h-[500px]"
+          >
+            <div v-if="wikitextSourcePreviewLoading" class="flex items-center justify-center py-10 gap-2 text-xs text-slate-400">
+              <span class="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+              <span>Rendering source preview...</span>
+            </div>
+            <div v-else v-html="wikitextSourcePreviewHtml || '<p class=\'text-slate-400 italic\'>No source wikitext to preview</p>'"></div>
+          </div>
         </div>
 
         <!-- Translation Column -->
@@ -477,18 +521,28 @@
         </div>
         <span class="font-semibold text-primary-600 dark:text-primary-400">{{ translationProgress }}%</span>
 
-        <!-- Source Article Link -->
-        <a
-          v-if="articleInput"
-          :href="`https://${fromLanguage}.wikipedia.org/wiki/${encodeURIComponent(articleInput)}`"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-medium transition-colors ml-auto text-[11px]"
-          title="Open source article on Wikipedia in new tab"
-        >
-          <span class="material-icons-round text-xs text-primary-500">open_in_new</span>
-          <span>{{ fromLanguage }}:{{ articleInput }}</span>
-        </a>
+        <!-- Source Article Link & Preview Source Button -->
+        <div v-if="articleInput" class="flex items-center gap-1.5 ml-auto">
+          <button
+            type="button"
+            @click="previewSourceArticleAction"
+            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-medium transition-colors text-[11px] cursor-pointer border border-slate-200/60 dark:border-white/[0.06]"
+            title="Preview entire source article rendered"
+          >
+            <span class="material-icons-round text-xs text-primary-500">visibility</span>
+            <span>Preview Source</span>
+          </button>
+          <a
+            :href="`https://${fromLanguage}.wikipedia.org/wiki/${encodeURIComponent(articleInput)}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-medium transition-colors text-[11px] border border-slate-200/60 dark:border-white/[0.06]"
+            title="Open source article on Wikipedia in new tab"
+          >
+            <span class="material-icons-round text-xs text-primary-500">open_in_new</span>
+            <span>{{ fromLanguage }}:{{ articleInput }}</span>
+          </a>
+        </div>
       </div>
 
       <!-- Sections List -->
@@ -505,6 +559,7 @@
             :reviewed="para.reviewed || false"
             :isSourceRtl="isSourceRtl"
             :isTargetRtl="isTargetRtl"
+            :sourceLang="fromLanguage"
             :targetLang="toLanguage"
             @translate-paragraph="translateParagraph"
             @update-translation="updateTranslation"
@@ -845,6 +900,8 @@
       :showPreview="showPreview"
       :previewLoading="previewLoading"
       :previewHtml="previewHtml"
+      :sourcePreviewHtml="sourcePreviewHtml"
+      :initialTab="previewModalInitialTab"
       :sourceWikitext="rawWikitext || paragraphs.map(p => p.source).join('\n\n')"
       :translatedWikitext="fullTranslatedText"
       :isSourceRtl="isSourceRtl"
@@ -922,6 +979,9 @@ export default {
       wikitextInput: '',
       wikitextTranslated: '',
       wikitextTranslating: false,
+      wikitextSourceView: 'text',
+      wikitextSourcePreviewHtml: '',
+      wikitextSourcePreviewLoading: false,
 
       // Template-only translation mode state
       showTemplateBox: false,
@@ -960,6 +1020,8 @@ export default {
       showPreview: false,
       previewHtml: '',
       previewLoading: false,
+      sourcePreviewHtml: '',
+      previewModalInitialTab: 'rendered',
 
       // Toast
       toastMessage: '',
@@ -2041,6 +2103,7 @@ reviewedCount() {
       }
       this.previewLoading = true;
       this.showPreview = true;
+      this.previewModalInitialTab = 'rendered';
       axios.post('/preview', {
         text: this.fullTranslatedText,
         language: this.toLanguage || this.fromLanguage,
@@ -2050,9 +2113,57 @@ reviewedCount() {
         .finally(() => { this.previewLoading = false; });
     },
 
+    async previewSourceArticleAction() {
+      const textToPreview = this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
+      if (!textToPreview) {
+        this.showToast(this.$t('warnings.emptySource'), 'warning');
+        return;
+      }
+      this.previewLoading = true;
+      this.showPreview = true;
+      this.previewModalInitialTab = 'source';
+      try {
+        const res = await axios.post('/preview', {
+          text: textToPreview,
+          language: this.fromLanguage || 'en',
+        });
+        this.sourcePreviewHtml = res.data?.html || '';
+      } catch {
+        this.showToast(this.$t('warnings.previewError'), 'error');
+      } finally {
+        this.previewLoading = false;
+      }
+    },
+
+    async toggleWikitextSourcePreview() {
+      if (this.wikitextSourceView === 'preview') {
+        this.wikitextSourceView = 'text';
+        return;
+      }
+      if (!this.wikitextInput.trim()) {
+        this.showToast(this.$t('warnings.emptySource'), 'warning');
+        return;
+      }
+      this.wikitextSourceView = 'preview';
+      this.wikitextSourcePreviewLoading = true;
+      try {
+        const res = await axios.post('/preview', {
+          text: this.wikitextInput,
+          language: this.fromLanguage || 'en',
+        });
+        this.wikitextSourcePreviewHtml = res.data?.html || '';
+      } catch {
+        this.showToast(this.$t('warnings.previewError'), 'error');
+      } finally {
+        this.wikitextSourcePreviewLoading = false;
+      }
+    },
+
     closePreview() {
       this.showPreview = false;
       this.previewHtml = '';
+      this.sourcePreviewHtml = '';
+      this.previewModalInitialTab = 'rendered';
     },
 
     copyAll() {

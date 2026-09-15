@@ -25,6 +25,18 @@
                   {{ $t('preview.title') }}
                 </button>
                 <button
+                  v-if="sourcePreviewHtml"
+                  @click="activeTab = 'source'"
+                  :class="[
+                    'px-3 py-1.5 rounded-lg transition-all',
+                    activeTab === 'source'
+                      ? 'bg-white dark:bg-zinc-800 text-primary-600 dark:text-primary-400 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  ]"
+                >
+                  Source Preview
+                </button>
+                <button
                   @click="activeTab = 'diff'"
                   :class="[
                     'px-3 py-1.5 rounded-lg transition-all',
@@ -74,6 +86,9 @@
             <!-- Rendered HTML Tab (Styled to match target Wikipedia / Vector skin) -->
             <div v-else-if="activeTab === 'rendered'" v-html="previewHtml" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="wiki-preview prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed"></div>
 
+            <!-- Source Preview HTML Tab -->
+            <div v-else-if="activeTab === 'source'" v-html="sourcePreviewHtml" :dir="isSourceRtl ? 'rtl' : 'ltr'" class="wiki-preview prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed"></div>
+
             <!-- Side-by-Side Diff Tab -->
             <div v-else-if="activeTab === 'diff'" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
               <!-- Source -->
@@ -106,6 +121,14 @@ export default {
     showPreview: Boolean,
     previewLoading: Boolean,
     previewHtml: String,
+    sourcePreviewHtml: {
+      type: String,
+      default: '',
+    },
+    initialTab: {
+      type: String,
+      default: 'rendered',
+    },
     sourceWikitext: {
       type: String,
       default: '',
@@ -131,6 +154,18 @@ export default {
     return {
       activeTab: 'rendered',
     };
+  },
+  watch: {
+    showPreview(val) {
+      if (val) {
+        this.activeTab = this.initialTab || 'rendered';
+      }
+    },
+    initialTab(val) {
+      if (val) {
+        this.activeTab = val;
+      }
+    },
   },
   methods: {
     closePreview() {

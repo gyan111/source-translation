@@ -60,7 +60,7 @@
       </div>
 
       <!-- Right Action Controls -->
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5 flex-wrap">
         <!-- Mark as Reviewed Toggle Button -->
         <button
           v-if="translation && status === 'translated'"
@@ -89,9 +89,10 @@
                 ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
                 : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
             ]"
+            title="Edit translation"
           >
             <span class="material-icons-round text-[12px]">edit</span>
-            Edit
+            <span>Edit</span>
           </button>
           <button
             type="button"
@@ -102,9 +103,10 @@
                 ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
                 : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
             ]"
+            title="Preview translation"
           >
             <span class="material-icons-round text-[12px]">visibility</span>
-            Preview
+            <span>Preview</span>
           </button>
         </div>
 
@@ -139,19 +141,67 @@
         <div class="flex items-center justify-between mb-1.5">
           <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
             <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-zinc-800 text-[10px] font-bold text-slate-600 dark:text-zinc-300">
-              <span class="material-icons-round text-[12px] mr-0.5 opacity-70">visibility</span>
+              <span class="material-icons-round text-[12px] mr-0.5 opacity-70">menu_book</span>
               {{ $t('paragraph.source') }}
             </span>
           </label>
-          <span class="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">{{ $t('paragraph.readOnly') }}</span>
+
+          <div class="flex items-center gap-2">
+            <!-- Source View Mode Switcher: Text vs Preview -->
+            <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+              <button
+                type="button"
+                @click="setSourceView('text')"
+                :class="[
+                  'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                  sourceView === 'text'
+                    ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                ]"
+                title="View raw source wikitext"
+              >
+                <span class="material-icons-round text-[12px]">code</span>
+                <span>Wikitext</span>
+              </button>
+              <button
+                type="button"
+                @click="setSourceView('preview')"
+                :class="[
+                  'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                  sourceView === 'preview'
+                    ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                ]"
+                title="Preview formatted source"
+              >
+                <span class="material-icons-round text-[12px]">visibility</span>
+                <span>Preview</span>
+              </button>
+            </div>
+            <span class="text-[10px] text-slate-400 dark:text-zinc-500 font-medium hidden sm:inline">{{ $t('paragraph.readOnly') }}</span>
+          </div>
         </div>
+        <!-- Raw Wikitext View -->
         <textarea
+          v-if="sourceView === 'text'"
           :value="source"
           readonly
           :dir="isSourceRtl ? 'rtl' : 'ltr'"
           class="textarea-field flex-1 bg-slate-100/70 dark:bg-zinc-950/60 text-slate-700 dark:text-zinc-300 min-h-[130px] border-slate-200 dark:border-white/[0.06] font-mono text-xs leading-relaxed focus:ring-0 focus:border-slate-300 dark:focus:border-white/10 resize-y"
           rows="5"
         ></textarea>
+        <!-- Preview View -->
+        <div
+          v-else
+          :dir="isSourceRtl ? 'rtl' : 'ltr'"
+          class="wiki-preview min-h-[130px] p-3.5 rounded-xl bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-white/[0.08] text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed overflow-y-auto max-h-[400px]"
+        >
+          <div v-if="sourcePreviewLoading" class="flex items-center justify-center py-6 gap-2 text-xs text-slate-400">
+            <span class="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+            <span>Rendering source preview...</span>
+          </div>
+          <div v-else v-html="sourcePreviewHtml || renderedSourcePreviewHtml"></div>
+        </div>
       </div>
 
       <!-- Translation Column (Right) -->
@@ -278,9 +328,50 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-[350px]">
               <!-- Source -->
               <div class="flex flex-col h-full">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-1.5">Original Wikitext</span>
-                <div class="flex-1 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/60 dark:border-white/[0.06] max-h-[55vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Original Wikitext</span>
+                  <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+                    <button
+                      type="button"
+                      @click="setSourceView('text')"
+                      :class="[
+                        'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                        sourceView === 'text'
+                          ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                      ]"
+                    >
+                      <span class="material-icons-round text-[12px]">code</span>
+                      <span>Wikitext</span>
+                    </button>
+                    <button
+                      type="button"
+                      @click="setSourceView('preview')"
+                      :class="[
+                        'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                        sourceView === 'preview'
+                          ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                      ]"
+                    >
+                      <span class="material-icons-round text-[12px]">visibility</span>
+                      Preview
+                    </button>
+                  </div>
+                </div>
+                <div v-if="sourceView === 'text'" class="flex-1 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/60 dark:border-white/[0.06] max-h-[55vh] overflow-y-auto">
                   <pre :dir="isSourceRtl ? 'rtl' : 'ltr'" class="text-xs font-mono text-slate-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed font-sans">{{ source }}</pre>
+                </div>
+                <div
+                  v-else
+                  :dir="isSourceRtl ? 'rtl' : 'ltr'"
+                  class="wiki-preview flex-1 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/60 dark:border-white/[0.06] max-h-[55vh] overflow-y-auto text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed"
+                >
+                  <div v-if="sourcePreviewLoading" class="flex items-center justify-center py-6 gap-2 text-xs text-slate-400">
+                    <span class="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Rendering source preview...</span>
+                  </div>
+                  <div v-else v-html="sourcePreviewHtml || renderedSourcePreviewHtml"></div>
                 </div>
               </div>
 
@@ -346,19 +437,30 @@ export default {
       type: Boolean,
       default: false,
     },
+    sourceLang: {
+      type: String,
+      default: 'en',
+    },
   },
   data() {
     return {
       activeView: 'edit', // 'edit' | 'preview'
+      sourceView: 'text', // 'text' | 'preview'
       isFocusModalOpen: false,
       previewHtml: '',
       previewLoading: false,
+      sourcePreviewHtml: '',
+      sourcePreviewLoading: false,
     };
   },
   computed: {
     renderedPreviewHtml() {
       if (!this.translation) return '<p class="text-slate-400 italic">No translation to preview</p>';
       return this.renderSimpleWikitext(this.translation);
+    },
+    renderedSourcePreviewHtml() {
+      if (!this.source) return '<p class="text-slate-400 italic">No source content to preview</p>';
+      return this.renderSimpleWikitext(this.source);
     },
     modificationPercent() {
       if (!this.originalTranslation || !this.translation) return 0;
@@ -389,6 +491,34 @@ export default {
         this.previewHtml = this.renderSimpleWikitext(this.translation);
       } finally {
         this.previewLoading = false;
+      }
+    },
+
+    async fetchSourcePreview() {
+      if (!this.source) {
+        this.sourcePreviewHtml = '<p class="text-slate-400 italic">No source content to preview</p>';
+        return;
+      }
+
+      this.sourcePreviewLoading = true;
+      try {
+        const lang = this.sourceLang || 'en';
+        const res = await axios.post('/preview', {
+          text: this.source,
+          language: lang,
+        });
+        this.sourcePreviewHtml = res.data?.html || this.renderSimpleWikitext(this.source);
+      } catch {
+        this.sourcePreviewHtml = this.renderSimpleWikitext(this.source);
+      } finally {
+        this.sourcePreviewLoading = false;
+      }
+    },
+
+    setSourceView(view) {
+      this.sourceView = view;
+      if (view === 'preview' && !this.sourcePreviewHtml) {
+        this.fetchSourcePreview();
       }
     },
 
@@ -521,6 +651,23 @@ export default {
     targetLang() {
       if (this.activeView === 'preview') {
         this.fetchPreview();
+      }
+    },
+    source() {
+      this.sourcePreviewHtml = '';
+      if (this.sourceView === 'preview') {
+        this.fetchSourcePreview();
+      }
+    },
+    sourceView(newVal) {
+      if (newVal === 'preview' && !this.sourcePreviewHtml) {
+        this.fetchSourcePreview();
+      }
+    },
+    sourceLang() {
+      this.sourcePreviewHtml = '';
+      if (this.sourceView === 'preview') {
+        this.fetchSourcePreview();
       }
     },
   },
