@@ -34,7 +34,7 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Oriya', 'Kalinga', 'Nirmala UI', 'Noto Sans Bengali', 'Vrinda', 'Noto Sans Devanagari', 'Mangal', 'Noto Sans Tamil', 'Latha', 'Noto Sans Telugu', 'Gautami', 'Noto Sans', sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Ol Chiki', 'Noto Sans Oriya', 'Kalinga', 'Nirmala UI', 'Noto Sans Bengali', 'Vrinda', 'Noto Sans Devanagari', 'Mangal', 'Noto Sans Tamil', 'Latha', 'Noto Sans Telugu', 'Gautami', 'Noto Sans', sans-serif;
 }
 
 #app {
@@ -50,5 +50,46 @@ body {
 
 .animate-shimmer-fast {
   animation: shimmerMove 1.8s infinite ease-in-out;
+}
+
+/* Wikimedia ULS & IME Selector Z-Index & Layout Enhancements */
+.imeselector {
+  z-index: 1050 !important;
+  font-family: inherit !important;
+  border-radius: 6px !important;
+}
+
+.imeselector-menu {
+  z-index: 1060 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(162, 169, 177, 0.5) !important;
+  overflow: hidden;
+}
+
+.uls-menu {
+  z-index: 10000 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.3), 0 10px 15px -5px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+}
+
+.ime-more-languages-wrapper {
+  border-top: 1px solid #eaecf0;
+  padding: 6px 12px;
+  background-color: #f8fafc;
+}
+
+.ime-more-languages-btn {
+  color: #2563eb !important;
+  font-weight: 600;
+  font-size: 12px;
+  display: block;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ime-more-languages-btn:hover {
+  text-decoration: underline;
 }
 

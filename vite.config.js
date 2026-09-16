@@ -36,6 +36,9 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
       }
+    },
+    test: {
+      include: ['tests/**/*.test.js'],
     }
   }
 })

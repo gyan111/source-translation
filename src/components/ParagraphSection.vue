@@ -262,6 +262,7 @@
         <div v-if="activeView === 'edit'" class="flex-1 flex flex-col">
           <textarea
             ref="translationTextarea"
+            :lang="targetLang"
             :value="translation"
             @input="handleInput"
             @click="handleTranslationClick"
@@ -379,6 +380,7 @@
                 <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1.5">Translated Text</span>
                 <textarea
                   ref="focusModalTextarea"
+                  :lang="targetLang"
                   :value="translation"
                   @input="handleInput"
                   :dir="isTargetRtl ? 'rtl' : 'ltr'"
@@ -405,6 +407,7 @@
 <script>
 import axios from 'axios';
 import { calculateModificationPercent } from '../utils/diffHelper.js';
+import { initIme } from '../utils/wikimediaIme.js';
 
 export default {
   name: 'ParagraphSection',
@@ -468,7 +471,9 @@ export default {
   },
   methods: {
     handleInput(e) {
-      this.$emit('update-translation', this.index, e.target.value);
+      if (e.target.value !== this.translation) {
+        this.$emit('update-translation', this.index, e.target.value);
+      }
       this.adjustHeight();
     },
 
@@ -631,9 +636,28 @@ export default {
 
       return `<p class="my-1">${html}</p>`;
     },
+    attachIme() {
+      this.$nextTick(() => {
+        if (this.$refs.translationTextarea) {
+          this.imeController = initIme(this.$refs.translationTextarea, this.targetLang);
+        }
+      });
+    },
+    attachFocusIme() {
+      this.$nextTick(() => {
+        if (this.$refs.focusModalTextarea) {
+          this.focusImeController = initIme(this.$refs.focusModalTextarea, this.targetLang);
+        }
+      });
+    },
   },
   mounted() {
     this.adjustHeight();
+    this.attachIme();
+  },
+  beforeUnmount() {
+    this.imeController?.destroy();
+    this.focusImeController?.destroy();
   },
   watch: {
     translation() {
@@ -645,11 +669,23 @@ export default {
     activeView(newVal) {
       if (newVal === 'preview') {
         this.fetchPreview();
+      } else if (newVal === 'edit') {
+        this.attachIme();
       }
     },
-    targetLang() {
+    targetLang(newVal) {
       if (this.activeView === 'preview') {
         this.fetchPreview();
+      }
+      this.imeController?.updateLanguage(newVal);
+      this.focusImeController?.updateLanguage(newVal);
+    },
+    isFocusModalOpen(isOpen) {
+      if (isOpen) {
+        this.attachFocusIme();
+      } else {
+        this.focusImeController?.destroy();
+        this.focusImeController = null;
       }
     },
     source() {

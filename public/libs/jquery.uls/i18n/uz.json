@@ -1,0 +1,28 @@
+{
+	"@metadata": {
+		"authors": [
+			"6ahodir",
+			"Akmalzhon",
+			"CoderSI",
+			"Mainculprit",
+			"Nataev",
+			"Procedural human",
+			"Таржимон"
+		]
+	},
+	"uls-region-WW": "Butun jahon",
+	"uls-region-SP": "Maxsus",
+	"uls-region-AM": "Amerika",
+	"uls-region-AF": "Afrika",
+	"uls-region-EU": "Yevropa",
+	"uls-region-AS": "Osiyo",
+	"uls-region-ME": "Yaqin Sharq",
+	"uls-region-PA": "Okeaniya",
+	"uls-region-all": "Barcha tillar",
+	"uls-no-results-found": "Natija topilmadi",
+	"uls-common-languages": "Tavsiya etilgan tillar",
+	"uls-no-results-suggestion-title": "Sizni qiziqtirishi mumkin:",
+	"uls-search-help": "Siz til nomi, yozuv nomi, tilning ISO kodi bo'yicha qidirishingiz yoki mintaqa bo'yicha ko'rib chiqishingiz mumkin.",
+	"uls-search-placeholder": "Til qidirish",
+	"uls-search-placeholder-short": "Qidiring"
+}

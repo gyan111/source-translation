@@ -61,9 +61,27 @@
         }
       }
     </script>
+    <!-- Wikimedia Universal Language Selector (ULS) & Input Method Editor (jquery.ime) (Local, no CDN) -->
+    <link rel="stylesheet" href="/libs/jquery.uls/css/jquery.uls.css" />
+    <link rel="stylesheet" href="/libs/jquery.uls/css/jquery.uls.grid.css" />
+    <link rel="stylesheet" href="/libs/jquery.uls/css/jquery.uls.lcd.css" />
+    <link rel="stylesheet" href="/libs/jquery.ime/css/jquery.ime.css" />
   </head>
   <body>
     <div id="app"></div>
+
+    <!-- Wikimedia ULS & jQuery.ime (100% self-hosted, Toolforge policy compliant) -->
+    <script src="/libs/jquery.min.js"></script>
+    <script src="/libs/jquery.uls/src/jquery.uls.data.js"></script>
+    <script src="/libs/jquery.uls/src/jquery.uls.data.utils.js"></script>
+    <script src="/libs/jquery.uls/src/jquery.uls.lcd.js"></script>
+    <script src="/libs/jquery.uls/src/jquery.uls.languagefilter.js"></script>
+    <script src="/libs/jquery.uls/src/jquery.uls.core.js"></script>
+    <script src="/libs/jquery.ime/src/jquery.ime.js"></script>
+    <script src="/libs/jquery.ime/src/jquery.ime.selector.js"></script>
+    <script src="/libs/jquery.ime/src/jquery.ime.preferences.js"></script>
+    <script src="/libs/jquery.ime/src/jquery.ime.inputmethods.js"></script>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

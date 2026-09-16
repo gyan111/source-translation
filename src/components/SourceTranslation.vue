@@ -279,7 +279,9 @@
             </div>
           </div>
           <textarea
+            ref="templateTranslatedTextarea"
             v-model="templateTranslated"
+            :lang="toLanguage"
             :dir="isTargetRtl ? 'rtl' : 'ltr'"
             class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[240px] bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/30 resize-y shadow-inner"
             placeholder="Translated template will appear here..."
@@ -415,7 +417,9 @@
             </div>
           </div>
           <textarea
+            ref="wikitextTranslatedTextarea"
             v-model="wikitextTranslated"
+            :lang="toLanguage"
             :dir="isTargetRtl ? 'rtl' : 'ltr'"
             class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[260px] bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/30 resize-y shadow-inner"
             placeholder="Translated wikitext will appear here..."
@@ -943,6 +947,7 @@ import debounce from 'lodash/debounce';
 import { isRtlLanguage } from '../i18n.js';
 import { calculateModificationPercent } from '../utils/diffHelper.js';
 import { splitWikitextIntoParagraphs } from '../utils/wikitextSplitter.js';
+import { initIme } from '../utils/wikimediaIme.js';
 
 export default {
   name: 'SourceTranslation',
@@ -1481,7 +1486,13 @@ reviewedCount() {
       if (newVal && this.articleInput && this.paragraphs.length) {
         this.checkArticleExists();
       }
+      this.modeImeController?.updateLanguage(newVal);
       this.saveState();
+    },
+    currentMode() {
+      this.modeImeController?.destroy();
+      this.modeImeController = null;
+      this.attachModeIme();
     },
     fromLanguage() { this.saveState(); },
     articleInput() { this.saveState(); },
@@ -1999,8 +2010,9 @@ reviewedCount() {
 
     updateTranslation(index, value, autoMarkReviewed = true) {
       if (this.paragraphs[index]) {
+        const textChanged = this.paragraphs[index].translation !== value;
         this.paragraphs[index].translation = value;
-        if (autoMarkReviewed && value) {
+        if (autoMarkReviewed && value && textChanged) {
           this.paragraphs[index].reviewed = true;
         }
         this.paragraphs[index].status = value ? 'translated' : 'pending';
@@ -2303,13 +2315,25 @@ reviewedCount() {
         this.translateMenuOpen = false;
       }
     },
+
+    attachModeIme() {
+      this.$nextTick(() => {
+        if (this.currentMode === 'template' && this.$refs.templateTranslatedTextarea) {
+          this.modeImeController = initIme(this.$refs.templateTranslatedTextarea, this.toLanguage);
+        } else if (this.currentMode === 'wikitext' && this.$refs.wikitextTranslatedTextarea) {
+          this.modeImeController = initIme(this.$refs.wikitextTranslatedTextarea, this.toLanguage);
+        }
+      });
+    },
   },
 
   mounted() {
     this.loadState();
+    this.attachModeIme();
     document.addEventListener('click', this.handleClickOutside);
   },
   beforeUnmount() {
+    this.modeImeController?.destroy();
     document.removeEventListener('click', this.handleClickOutside);
   },
 };
