@@ -55,6 +55,63 @@ describe('translationController', () => {
       expect(res.json).toHaveBeenCalledWith({ html: mockHtml });
     });
 
+    it('successfully renders standalone template wikitext via MediaWiki API', async () => {
+      const mockInfoboxHtml = '<table class="infobox"><tr><th>Albert Einstein</th></tr></table>';
+      axios.post.mockResolvedValueOnce({
+        data: {
+          parse: {
+            text: {
+              '*': mockInfoboxHtml,
+            },
+          },
+        },
+      });
+
+      const req = {
+        body: {
+          text: '{{Infobox person | name = Albert Einstein }}',
+          language: 'en',
+        },
+      };
+      const res = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn(),
+      };
+
+      await preview(req, res);
+
+      expect(axios.post).toHaveBeenCalledWith(
+        'https://en.wikipedia.org/w/api.php',
+        expect.stringContaining('contentmodel=wikitext'),
+        expect.any(Object)
+      );
+      expect(res.json).toHaveBeenCalledWith({ html: mockInfoboxHtml });
+    });
+
+    it('returns default placeholder html when MediaWiki returns empty text', async () => {
+      axios.post.mockResolvedValueOnce({
+        data: {
+          parse: {},
+        },
+      });
+
+      const req = {
+        body: {
+          text: ' ',
+          language: 'sat',
+        },
+      };
+      const res = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn(),
+      };
+
+      await preview(req, res);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        html: expect.stringContaining('No content rendered'),
+      }));
+    });
+
     it('handles MediaWiki API errors gracefully', async () => {
       axios.post.mockRejectedValueOnce(new Error('Network Error'));
 

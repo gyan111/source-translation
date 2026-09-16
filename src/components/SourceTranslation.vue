@@ -220,15 +220,26 @@
             </select>
           </div>
 
-          <!-- Upper Action Button -->
-          <button
-            @click="translateTemplateMode"
-            :disabled="templateTranslating || !templateInput.trim()"
-            class="btn-success text-xs py-2 px-4 flex items-center gap-1.5 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
-          >
-            <span class="material-icons-round text-sm" :class="{ 'animate-spin': templateTranslating }">{{ templateTranslating ? 'refresh' : 'translate' }}</span>
-            <span>{{ templateTranslating ? 'Translating...' : 'Translate Template' }}</span>
-          </button>
+          <!-- Upper Action Buttons -->
+          <div class="flex items-center gap-2">
+            <button
+              @click="previewAction"
+              :disabled="!templateInput.trim() && !templateTranslated.trim()"
+              class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Open side-by-side template preview"
+            >
+              <span class="material-icons-round text-sm text-amber-500">visibility</span>
+              <span>Preview</span>
+            </button>
+            <button
+              @click="translateTemplateMode"
+              :disabled="templateTranslating || !templateInput.trim()"
+              class="btn-success text-xs py-2 px-4 flex items-center gap-1.5 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
+            >
+              <span class="material-icons-round text-sm" :class="{ 'animate-spin': templateTranslating }">{{ templateTranslating ? 'refresh' : 'translate' }}</span>
+              <span>{{ templateTranslating ? 'Translating...' : 'Translate Template' }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -252,33 +263,116 @@
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Original Template</span>
-            <button
-              v-if="templateInput"
-              @click="templateInput = ''; templateTranslated = ''; templateStats = null;"
-              class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
-            >
-              Clear
-            </button>
+            <div class="flex items-center gap-1.5">
+              <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+                <button
+                  type="button"
+                  @click="templateSourceView = 'text'"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    templateSourceView === 'text'
+                      ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="View template code"
+                >
+                  <span class="material-icons-round text-[12px]">code</span>
+                  <span>Code</span>
+                </button>
+                <button
+                  type="button"
+                  @click="toggleTemplateSourcePreview"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    templateSourceView === 'preview'
+                      ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="Preview source template"
+                >
+                  <span class="material-icons-round text-[12px]">visibility</span>
+                  <span>Preview</span>
+                </button>
+              </div>
+              <button
+                v-if="templateInput"
+                @click="templateInput = ''; templateTranslated = ''; templateStats = null; templateSourceView = 'text'; templateTargetView = 'text';"
+                class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
           </div>
           <textarea
+            v-if="templateSourceView === 'text'"
             v-model="templateInput"
             :dir="isSourceRtl ? 'rtl' : 'ltr'"
             class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[240px] bg-slate-50/70 dark:bg-zinc-950/60 resize-y"
             placeholder="Paste template here, e.g. {{Infobox settlement | name = Kendrapara | population_total = 41404}}"
           ></textarea>
+          <div
+            v-else
+            :dir="isSourceRtl ? 'rtl' : 'ltr'"
+            class="wiki-preview flex-1 min-h-[240px] p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-white/[0.08] text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed overflow-y-auto max-h-[500px]"
+          >
+            <div v-if="templateSourcePreviewLoading" class="flex items-center justify-center py-10 gap-2 text-xs text-slate-400">
+              <span class="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+              <span>Rendering source template preview...</span>
+            </div>
+            <div v-else v-html="templateSourcePreviewHtml || '<p class=\'text-slate-400 italic\'>No source template to preview</p>'"></div>
+          </div>
         </div>
 
         <!-- Translation Column -->
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Translated Template</span>
-            <div v-if="templateTranslated" class="flex items-center gap-1.5">
-              <button @click="copyTemplateResult" class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1">
+            <div class="flex items-center gap-1.5">
+              <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+                <button
+                  type="button"
+                  @click="templateTargetView = 'text'; attachModeIme();"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    templateTargetView === 'text'
+                      ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="View translated code"
+                >
+                  <span class="material-icons-round text-[12px]">code</span>
+                  <span>Code</span>
+                </button>
+                <button
+                  type="button"
+                  @click="toggleTemplateTargetPreview"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    templateTargetView === 'preview'
+                      ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="Preview translated template"
+                >
+                  <span class="material-icons-round text-[12px]">visibility</span>
+                  <span>Preview</span>
+                </button>
+              </div>
+              <button
+                @click="previewAction"
+                :disabled="!templateInput.trim() && !templateTranslated.trim()"
+                class="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer mr-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                title="Open side-by-side preview modal"
+              >
+                <span class="material-icons-round text-xs">open_in_full</span> Full Preview
+              </button>
+              <button v-if="templateTranslated" @click="copyTemplateResult" class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 cursor-pointer">
                 <span class="material-icons-round text-xs">content_copy</span> Copy
               </button>
             </div>
           </div>
           <textarea
+            v-if="templateTargetView === 'text'"
             ref="templateTranslatedTextarea"
             v-model="templateTranslated"
             :lang="toLanguage"
@@ -286,6 +380,17 @@
             class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[240px] bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/30 resize-y shadow-inner"
             placeholder="Translated template will appear here..."
           ></textarea>
+          <div
+            v-else
+            :dir="isTargetRtl ? 'rtl' : 'ltr'"
+            class="wiki-preview flex-1 min-h-[240px] p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-white/[0.08] text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed overflow-y-auto max-h-[500px]"
+          >
+            <div v-if="templateTargetPreviewLoading" class="flex items-center justify-center py-10 gap-2 text-xs text-slate-400">
+              <span class="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+              <span>Rendering translated template preview...</span>
+            </div>
+            <div v-else v-html="templateTargetPreviewHtml || '<p class=\'text-slate-400 italic\'>No translated template to preview</p>'"></div>
+          </div>
         </div>
       </div>
 
@@ -328,15 +433,26 @@
             </select>
           </div>
 
-          <!-- Upper Action Button -->
-          <button
-            @click="translateWikitextMode"
-            :disabled="wikitextTranslating || !wikitextInput.trim()"
-            class="btn-success text-xs py-2 px-4 flex items-center gap-1.5 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
-          >
-            <span class="material-icons-round text-sm" :class="{ 'animate-spin': wikitextTranslating }">{{ wikitextTranslating ? 'refresh' : 'translate' }}</span>
-            <span>{{ wikitextTranslating ? 'Translating...' : 'Translate Wikitext' }}</span>
-          </button>
+          <!-- Upper Action Buttons -->
+          <div class="flex items-center gap-2">
+            <button
+              @click="previewAction"
+              :disabled="!wikitextInput.trim() && !wikitextTranslated.trim()"
+              class="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Open side-by-side wikitext preview"
+            >
+              <span class="material-icons-round text-sm text-amber-500">visibility</span>
+              <span>Preview</span>
+            </button>
+            <button
+              @click="translateWikitextMode"
+              :disabled="wikitextTranslating || !wikitextInput.trim()"
+              class="btn-success text-xs py-2 px-4 flex items-center gap-1.5 disabled:opacity-50 shadow-sm cursor-pointer whitespace-nowrap"
+            >
+              <span class="material-icons-round text-sm" :class="{ 'animate-spin': wikitextTranslating }">{{ wikitextTranslating ? 'refresh' : 'translate' }}</span>
+              <span>{{ wikitextTranslating ? 'Translating...' : 'Translate Wikitext' }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -347,7 +463,7 @@
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Source Wikitext</span>
             <div class="flex items-center gap-1.5">
-              <div v-if="wikitextInput" class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+              <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
                 <button
                   type="button"
                   @click="wikitextSourceView = 'text'"
@@ -374,12 +490,12 @@
                   title="Preview source wikitext"
                 >
                   <span class="material-icons-round text-[12px]">visibility</span>
-                  Preview
+                  <span>Preview</span>
                 </button>
               </div>
               <button
                 v-if="wikitextInput"
-                @click="wikitextInput = ''; wikitextTranslated = ''; wikitextSourceView = 'text';"
+                @click="wikitextInput = ''; wikitextTranslated = ''; wikitextSourceView = 'text'; wikitextTargetView = 'text';"
                 class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
               >
                 Clear
@@ -410,13 +526,52 @@
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Translated Wikitext</span>
-            <div v-if="wikitextTranslated" class="flex items-center gap-2">
-              <button @click="copyWikitextResult" class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1">
+            <div class="flex items-center gap-1.5">
+              <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+                <button
+                  type="button"
+                  @click="wikitextTargetView = 'text'; attachModeIme();"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    wikitextTargetView === 'text'
+                      ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="View translated wikitext"
+                >
+                  <span class="material-icons-round text-[12px]">code</span>
+                  <span>Wikitext</span>
+                </button>
+                <button
+                  type="button"
+                  @click="toggleWikitextTargetPreview"
+                  :class="[
+                    'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                    wikitextTargetView === 'preview'
+                      ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                  ]"
+                  title="Preview translated wikitext"
+                >
+                  <span class="material-icons-round text-[12px]">visibility</span>
+                  <span>Preview</span>
+                </button>
+              </div>
+              <button
+                @click="previewAction"
+                :disabled="!wikitextInput.trim() && !wikitextTranslated.trim()"
+                class="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer mr-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                title="Open side-by-side preview modal"
+              >
+                <span class="material-icons-round text-xs">open_in_full</span> Full Preview
+              </button>
+              <button v-if="wikitextTranslated" @click="copyWikitextResult" class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 cursor-pointer">
                 <span class="material-icons-round text-xs">content_copy</span> Copy
               </button>
             </div>
           </div>
           <textarea
+            v-if="wikitextTargetView === 'text'"
             ref="wikitextTranslatedTextarea"
             v-model="wikitextTranslated"
             :lang="toLanguage"
@@ -424,6 +579,17 @@
             class="textarea-field flex-1 font-mono text-xs leading-relaxed min-h-[260px] bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/30 resize-y shadow-inner"
             placeholder="Translated wikitext will appear here..."
           ></textarea>
+          <div
+            v-else
+            :dir="isTargetRtl ? 'rtl' : 'ltr'"
+            class="wiki-preview flex-1 min-h-[260px] p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-950/60 border border-slate-200 dark:border-white/[0.08] text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed overflow-y-auto max-h-[500px]"
+          >
+            <div v-if="wikitextTargetPreviewLoading" class="flex items-center justify-center py-10 gap-2 text-xs text-slate-400">
+              <span class="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+              <span>Rendering translated preview...</span>
+            </div>
+            <div v-else v-html="wikitextTargetPreviewHtml || '<p class=\'text-slate-400 italic\'>No translated wikitext to preview</p>'"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -906,8 +1072,8 @@
       :previewHtml="previewHtml"
       :sourcePreviewHtml="sourcePreviewHtml"
       :initialTab="previewModalInitialTab"
-      :sourceWikitext="rawWikitext || paragraphs.map(p => p.source).join('\n\n')"
-      :translatedWikitext="fullTranslatedText"
+      :sourceWikitext="previewModalSourceWikitext"
+      :translatedWikitext="previewModalTranslatedWikitext"
       :isSourceRtl="isSourceRtl"
       :isTargetRtl="isTargetRtl"
       :user="user"
@@ -987,6 +1153,9 @@ export default {
       wikitextSourceView: 'text',
       wikitextSourcePreviewHtml: '',
       wikitextSourcePreviewLoading: false,
+      wikitextTargetView: 'text',
+      wikitextTargetPreviewHtml: '',
+      wikitextTargetPreviewLoading: false,
 
       // Template-only translation mode state
       showTemplateBox: false,
@@ -994,6 +1163,12 @@ export default {
       templateTranslated: '',
       templateTranslating: false,
       templateStats: null,
+      templateSourceView: 'text',
+      templateSourcePreviewHtml: '',
+      templateSourcePreviewLoading: false,
+      templateTargetView: 'text',
+      templateTargetPreviewHtml: '',
+      templateTargetPreviewLoading: false,
 
       // Translation service & options
       translationService: 'mint',
@@ -1406,7 +1581,31 @@ export default {
       return this.paragraphs.map(p => p.translation || '').filter(Boolean).join('\n\n');
     },
     hasAnyTranslation() {
+      if (this.currentMode === 'wikitext') {
+        return Boolean(this.wikitextTranslated && this.wikitextTranslated.trim());
+      }
+      if (this.currentMode === 'template') {
+        return Boolean(this.templateTranslated && this.templateTranslated.trim());
+      }
       return this.paragraphs.some(p => p.translation);
+    },
+    previewModalSourceWikitext() {
+      if (this.currentMode === 'wikitext') {
+        return this.wikitextInput || '';
+      }
+      if (this.currentMode === 'template') {
+        return this.templateInput || '';
+      }
+      return this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
+    },
+    previewModalTranslatedWikitext() {
+      if (this.currentMode === 'wikitext') {
+        return this.wikitextTranslated || '';
+      }
+      if (this.currentMode === 'template') {
+        return this.templateTranslated || '';
+      }
+      return this.fullTranslatedText;
     },
     translatedCount() {
       return this.paragraphs.filter(p => p.status === 'translated').length;
@@ -1487,6 +1686,12 @@ reviewedCount() {
         this.checkArticleExists();
       }
       this.modeImeController?.updateLanguage(newVal);
+      if (this.wikitextTargetView === 'preview' && this.wikitextTranslated) {
+        this.fetchWikitextTargetPreview();
+      }
+      if (this.templateTargetView === 'preview' && this.templateTranslated) {
+        this.fetchTemplateTargetPreview();
+      }
       this.saveState();
     },
     currentMode() {
@@ -1494,7 +1699,15 @@ reviewedCount() {
       this.modeImeController = null;
       this.attachModeIme();
     },
-    fromLanguage() { this.saveState(); },
+    fromLanguage() {
+      if (this.wikitextSourceView === 'preview' && this.wikitextInput) {
+        this.fetchWikitextSourcePreview();
+      }
+      if (this.templateSourceView === 'preview' && this.templateInput) {
+        this.fetchTemplateSourcePreview();
+      }
+      this.saveState();
+    },
     articleInput() { this.saveState(); },
     translationService() { this.saveState(); },
     serviceKeys: {
@@ -2057,6 +2270,9 @@ reviewedCount() {
           missingLinkStrategy: this.missingLinkStrategy,
         });
         this.wikitextTranslated = response.data?.translatedText || response.data?.translation || response.data?.text || '';
+        if (this.wikitextTargetView === 'preview' && this.wikitextTranslated) {
+          this.fetchWikitextTargetPreview();
+        }
       } catch (err) {
         console.error('Wikitext translation error:', err);
         this.showToast(this.$t('warnings.translationError'));
@@ -2098,6 +2314,9 @@ reviewedCount() {
         this.templateStats = response.data?.stats || null;
         if (this.templateTranslated) {
           this.showToast('Template translated successfully!', 'success');
+          if (this.templateTargetView === 'preview') {
+            this.fetchTemplateTargetPreview();
+          }
         }
       } catch (err) {
         console.error('Template translation error:', err);
@@ -2108,25 +2327,60 @@ reviewedCount() {
       }
     },
 
-    previewAction() {
-      if (!this.hasAnyTranslation) {
+    async previewAction() {
+      let textToPreview = '';
+      let sourceText = '';
+
+      if (this.currentMode === 'wikitext') {
+        textToPreview = this.wikitextTranslated;
+        sourceText = this.wikitextInput;
+      } else if (this.currentMode === 'template') {
+        textToPreview = this.templateTranslated;
+        sourceText = this.templateInput;
+      } else {
+        textToPreview = this.fullTranslatedText;
+        sourceText = this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
+      }
+
+      if (!textToPreview && !sourceText) {
         this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
         return;
       }
+
       this.previewLoading = true;
       this.showPreview = true;
-      this.previewModalInitialTab = 'rendered';
-      axios.post('/preview', {
-        text: this.fullTranslatedText,
-        language: this.toLanguage || this.fromLanguage,
-      })
-        .then(res => { this.previewHtml = res.data.html; })
-        .catch(() => { this.showToast(this.$t('warnings.previewError')); })
-        .finally(() => { this.previewLoading = false; });
+      this.previewModalInitialTab = textToPreview ? 'rendered' : 'source';
+
+      const targetLang = this.toLanguage || this.fromLanguage || 'en';
+      const sourceLang = this.fromLanguage || 'en';
+
+      try {
+        const targetReq = textToPreview ? axios.post('/preview', {
+          text: textToPreview,
+          language: targetLang,
+        }).catch(() => null) : Promise.resolve(null);
+
+        const sourceReq = sourceText ? axios.post('/preview', {
+          text: sourceText,
+          language: sourceLang,
+        }).catch(() => null) : Promise.resolve(null);
+
+        const [targetRes, sourceRes] = await Promise.all([targetReq, sourceReq]);
+        this.previewHtml = targetRes?.data?.html || '';
+        this.sourcePreviewHtml = sourceRes?.data?.html || '';
+      } catch {
+        this.showToast(this.$t('warnings.previewError'), 'error');
+      } finally {
+        this.previewLoading = false;
+      }
     },
 
     async previewSourceArticleAction() {
-      const textToPreview = this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
+      const textToPreview = this.currentMode === 'wikitext'
+        ? this.wikitextInput
+        : this.currentMode === 'template'
+          ? this.templateInput
+          : (this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : ''));
       if (!textToPreview) {
         this.showToast(this.$t('warnings.emptySource'), 'warning');
         return;
@@ -2147,16 +2401,8 @@ reviewedCount() {
       }
     },
 
-    async toggleWikitextSourcePreview() {
-      if (this.wikitextSourceView === 'preview') {
-        this.wikitextSourceView = 'text';
-        return;
-      }
-      if (!this.wikitextInput.trim()) {
-        this.showToast(this.$t('warnings.emptySource'), 'warning');
-        return;
-      }
-      this.wikitextSourceView = 'preview';
+    async fetchWikitextSourcePreview() {
+      if (!this.wikitextInput.trim()) return;
       this.wikitextSourcePreviewLoading = true;
       try {
         const res = await axios.post('/preview', {
@@ -2169,6 +2415,108 @@ reviewedCount() {
       } finally {
         this.wikitextSourcePreviewLoading = false;
       }
+    },
+
+    async toggleWikitextSourcePreview() {
+      if (this.wikitextSourceView === 'preview') {
+        this.wikitextSourceView = 'text';
+        return;
+      }
+      this.wikitextSourceView = 'preview';
+      if (!this.wikitextInput.trim()) {
+        this.wikitextSourcePreviewHtml = '<p class="text-slate-400 italic">No source wikitext entered yet. Paste wikitext to see preview.</p>';
+        return;
+      }
+      await this.fetchWikitextSourcePreview();
+    },
+
+    async fetchWikitextTargetPreview() {
+      if (!this.wikitextTranslated.trim()) return;
+      this.wikitextTargetPreviewLoading = true;
+      try {
+        const res = await axios.post('/preview', {
+          text: this.wikitextTranslated,
+          language: this.toLanguage || this.fromLanguage || 'en',
+        });
+        this.wikitextTargetPreviewHtml = res.data?.html || '';
+      } catch {
+        this.showToast(this.$t('warnings.previewError'), 'error');
+      } finally {
+        this.wikitextTargetPreviewLoading = false;
+      }
+    },
+
+    async toggleWikitextTargetPreview() {
+      if (this.wikitextTargetView === 'preview') {
+        this.wikitextTargetView = 'text';
+        this.attachModeIme();
+        return;
+      }
+      this.wikitextTargetView = 'preview';
+      if (!this.wikitextTranslated.trim()) {
+        this.wikitextTargetPreviewHtml = '<p class="text-slate-400 italic">No translated wikitext to preview yet. Translate wikitext to see preview.</p>';
+        return;
+      }
+      await this.fetchWikitextTargetPreview();
+    },
+
+    async fetchTemplateSourcePreview() {
+      if (!this.templateInput.trim()) return;
+      this.templateSourcePreviewLoading = true;
+      try {
+        const res = await axios.post('/preview', {
+          text: this.templateInput,
+          language: this.fromLanguage || 'en',
+        });
+        this.templateSourcePreviewHtml = res.data?.html || '';
+      } catch {
+        this.showToast(this.$t('warnings.previewError'), 'error');
+      } finally {
+        this.templateSourcePreviewLoading = false;
+      }
+    },
+
+    async toggleTemplateSourcePreview() {
+      if (this.templateSourceView === 'preview') {
+        this.templateSourceView = 'text';
+        return;
+      }
+      this.templateSourceView = 'preview';
+      if (!this.templateInput.trim()) {
+        this.templateSourcePreviewHtml = '<p class="text-slate-400 italic">No template entered yet. Paste or load a template to see preview.</p>';
+        return;
+      }
+      await this.fetchTemplateSourcePreview();
+    },
+
+    async fetchTemplateTargetPreview() {
+      if (!this.templateTranslated.trim()) return;
+      this.templateTargetPreviewLoading = true;
+      try {
+        const res = await axios.post('/preview', {
+          text: this.templateTranslated,
+          language: this.toLanguage || this.fromLanguage || 'en',
+        });
+        this.templateTargetPreviewHtml = res.data?.html || '';
+      } catch {
+        this.showToast(this.$t('warnings.previewError'), 'error');
+      } finally {
+        this.templateTargetPreviewLoading = false;
+      }
+    },
+
+    async toggleTemplateTargetPreview() {
+      if (this.templateTargetView === 'preview') {
+        this.templateTargetView = 'text';
+        this.attachModeIme();
+        return;
+      }
+      this.templateTargetView = 'preview';
+      if (!this.templateTranslated.trim()) {
+        this.templateTargetPreviewHtml = '<p class="text-slate-400 italic">No translated template to preview yet. Translate the template to see preview.</p>';
+        return;
+      }
+      await this.fetchTemplateTargetPreview();
     },
 
     closePreview() {

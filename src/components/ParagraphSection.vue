@@ -111,10 +111,10 @@
         </button>
 
         <!-- View Mode Switcher: Edit vs Preview -->
-        <div v-if="translation" class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium mr-1">
+        <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium mr-1">
           <button
             type="button"
-            @click="activeView = 'edit'"
+            @click="setTargetView('edit')"
             :class="[
               'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
               activeView === 'edit'
@@ -128,7 +128,7 @@
           </button>
           <button
             type="button"
-            @click="activeView = 'preview'"
+            @click="setTargetView('preview')"
             :class="[
               'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
               activeView === 'preview'
@@ -375,18 +375,64 @@
                 </div>
               </div>
 
-              <!-- Translation Editor -->
+              <!-- Translation Column -->
               <div class="flex flex-col h-full">
-                <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1.5">Translated Text</span>
-                <textarea
-                  ref="focusModalTextarea"
-                  :lang="targetLang"
-                  :value="translation"
-                  @input="handleInput"
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Translated Text</span>
+                  <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+                    <button
+                      type="button"
+                      @click="setTargetView('edit')"
+                      :class="[
+                        'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                        activeView === 'edit'
+                          ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                      ]"
+                      title="Edit translation"
+                    >
+                      <span class="material-icons-round text-[12px]">edit</span>
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      @click="setTargetView('preview')"
+                      :class="[
+                        'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+                        activeView === 'preview'
+                          ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+                      ]"
+                      title="Preview translation"
+                    >
+                      <span class="material-icons-round text-[12px]">visibility</span>
+                      <span>Preview</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="activeView === 'edit'" class="flex-1 flex flex-col">
+                  <textarea
+                    ref="focusModalTextarea"
+                    :lang="targetLang"
+                    :value="translation"
+                    @input="handleInput"
+                    :dir="isTargetRtl ? 'rtl' : 'ltr'"
+                    class="textarea-field flex-1 p-4 rounded-2xl bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/40 text-slate-900 dark:text-zinc-100 font-sans text-sm leading-relaxed resize-none shadow-inner max-h-[55vh] overflow-y-auto"
+                    placeholder="Enter or edit translation..."
+                  ></textarea>
+                </div>
+                <div
+                  v-else
                   :dir="isTargetRtl ? 'rtl' : 'ltr'"
-                  class="textarea-field flex-1 p-4 rounded-2xl bg-white dark:bg-zinc-900 border-primary-300 dark:border-primary-500/40 text-slate-900 dark:text-zinc-100 font-sans text-sm leading-relaxed resize-none shadow-inner max-h-[55vh] overflow-y-auto"
-                  placeholder="Enter or edit translation..."
-                ></textarea>
+                  class="wiki-preview flex-1 p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/60 dark:border-white/[0.06] max-h-[55vh] overflow-y-auto text-xs sm:text-sm text-slate-800 dark:text-zinc-200 leading-relaxed"
+                >
+                  <div v-if="previewLoading" class="flex items-center justify-center py-6 gap-2 text-xs text-slate-400">
+                    <span class="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Rendering translation preview...</span>
+                  </div>
+                  <div v-else v-html="previewHtml || renderedPreviewHtml"></div>
+                </div>
               </div>
             </div>
 
@@ -523,6 +569,20 @@ export default {
       this.sourceView = view;
       if (view === 'preview' && !this.sourcePreviewHtml) {
         this.fetchSourcePreview();
+      }
+    },
+
+    setTargetView(view) {
+      this.activeView = view;
+      if (view === 'preview') {
+        this.fetchPreview();
+      } else if (view === 'edit') {
+        this.$nextTick(() => {
+          this.attachIme();
+          if (this.isFocusModalOpen) {
+            this.attachFocusIme();
+          }
+        });
       }
     },
 
@@ -670,7 +730,12 @@ export default {
       if (newVal === 'preview') {
         this.fetchPreview();
       } else if (newVal === 'edit') {
-        this.attachIme();
+        this.$nextTick(() => {
+          this.attachIme();
+          if (this.isFocusModalOpen) {
+            this.attachFocusIme();
+          }
+        });
       }
     },
     targetLang(newVal) {
@@ -682,7 +747,16 @@ export default {
     },
     isFocusModalOpen(isOpen) {
       if (isOpen) {
-        this.attachFocusIme();
+        if (this.activeView === 'edit') {
+          this.$nextTick(() => {
+            this.attachFocusIme();
+          });
+        } else if (this.activeView === 'preview') {
+          this.fetchPreview();
+        }
+        if (this.sourceView === 'preview' && !this.sourcePreviewHtml) {
+          this.fetchSourcePreview();
+        }
       } else {
         this.focusImeController?.destroy();
         this.focusImeController = null;
