@@ -258,39 +258,165 @@ export const analyticsService = {
   },
 
   /**
-   * Get recent event stream with optional user filtering.
+   * Get recent event stream with optional user filtering, pagination, sorting, and search.
    */
-  async getRecentEvents(limit = 60, userFilter = null) {
+  async getRecentEvents(limitOrOptions = 60, legacyUserFilter = null) {
+    let options = {};
+    if (typeof limitOrOptions === 'object' && limitOrOptions !== null) {
+      options = limitOrOptions;
+    } else {
+      options = {
+        limit: Number(limitOrOptions) || 60,
+        userFilter: legacyUserFilter,
+        page: 1,
+      };
+    }
+
+    const page = Math.max(1, parseInt(options.page || 1, 10));
+    const limit = Math.min(100, Math.max(1, parseInt(options.limit || 25, 10)));
+    const offset = (page - 1) * limit;
+    const userFilter = options.userFilter || options.user || null;
+    const eventType = options.eventType || null;
+    const targetLang = options.targetLang || options.lang || null;
+    const mtEngine = options.mtEngine || options.engine || null;
+    const search = options.search ? options.search.trim().toLowerCase() : null;
+    const sortBy = options.sortBy || 'createdAt';
+    const sortOrder = (options.sortOrder || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
     if (!isDatabaseConnected()) {
-      let list = inMemoryEvents;
+      let list = [...inMemoryEvents];
+
       if (userFilter) {
         list = list.filter(e => e.wikiUser && e.wikiUser.toLowerCase() === userFilter.toLowerCase());
       }
-      return list.slice(0, limit);
+      if (eventType && eventType !== 'all') {
+        if (eventType === 'export') {
+          list = list.filter(e => e.eventType === 'copy' || e.eventType === 'export');
+        } else {
+          list = list.filter(e => e.eventType === eventType);
+        }
+      }
+      if (targetLang && targetLang !== 'all') {
+        list = list.filter(e => e.targetLang && e.targetLang.toLowerCase() === targetLang.toLowerCase());
+      }
+      if (mtEngine && mtEngine !== 'all') {
+        list = list.filter(e => e.mtEngine && e.mtEngine.toLowerCase() === mtEngine.toLowerCase());
+      }
+      if (search) {
+        list = list.filter(e => 
+          (e.sourceTitle && e.sourceTitle.toLowerCase().includes(search)) ||
+          (e.targetTitle && e.targetTitle.toLowerCase().includes(search)) ||
+          (e.wikiUser && e.wikiUser.toLowerCase().includes(search))
+        );
+      }
+
+      // In-memory sorting
+      list.sort((a, b) => {
+        let valA, valB;
+        if (sortBy === 'wordCount') {
+          valA = a.wordCount || 0;
+          valB = b.wordCount || 0;
+        } else if (sortBy === 'sourceTitle') {
+          valA = (a.sourceTitle || '').toLowerCase();
+          valB = (b.sourceTitle || '').toLowerCase();
+        } else if (sortBy === 'targetTitle') {
+          valA = (a.targetTitle || '').toLowerCase();
+          valB = (b.targetTitle || '').toLowerCase();
+        } else if (sortBy === 'wikiUser') {
+          valA = (a.wikiUser || '').toLowerCase();
+          valB = (b.wikiUser || '').toLowerCase();
+        } else if (sortBy === 'eventType') {
+          valA = (a.eventType || '').toLowerCase();
+          valB = (b.eventType || '').toLowerCase();
+        } else {
+          // Default: createdAt
+          valA = new Date(a.createdAt || 0).getTime();
+          valB = new Date(b.createdAt || 0).getTime();
+        }
+
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      const total = list.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const pagedList = list.slice(offset, offset + limit);
+
+      // Attach pagination properties for callers while keeping Array interface
+      Object.assign(pagedList, {
+        total,
+        page,
+        limit,
+        totalPages,
+      });
+
+      return pagedList;
     }
 
     try {
-      let sql = `
+      const sortColumnMap = {
+        createdAt: 'created_at',
+        wordCount: 'word_count',
+        sourceTitle: 'source_title',
+        targetTitle: 'target_title',
+        wikiUser: 'wiki_user',
+        eventType: 'event_type',
+      };
+      const sortCol = sortColumnMap[sortBy] || 'created_at';
+      const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+      const whereClauses = [];
+      const params = [];
+
+      if (userFilter) {
+        whereClauses.push('wiki_user = ?');
+        params.push(userFilter);
+      }
+      if (eventType && eventType !== 'all') {
+        if (eventType === 'export') {
+          whereClauses.push("event_type IN ('copy', 'export')");
+        } else {
+          whereClauses.push('event_type = ?');
+          params.push(eventType);
+        }
+      }
+      if (targetLang && targetLang !== 'all') {
+        whereClauses.push('target_lang = ?');
+        params.push(targetLang);
+      }
+      if (mtEngine && mtEngine !== 'all') {
+        whereClauses.push('mt_engine = ?');
+        params.push(mtEngine);
+      }
+      if (search) {
+        whereClauses.push('(source_title LIKE ? OR target_title LIKE ? OR wiki_user LIKE ?)');
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      const whereSql = whereClauses.length > 0 ? ` WHERE ${whereClauses.join(' AND ')} ` : '';
+
+      // Count query
+      const [countRow] = await query(`SELECT COUNT(*) as total FROM translation_events ${whereSql}`, params);
+      const total = Number(countRow?.total || 0);
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
+      // Data query
+      const dataSql = `
         SELECT 
           id, session_id, wiki_user, event_type, 
           source_lang, target_lang, source_title, target_title, 
           word_count, char_count, section_count, mt_engine, 
           target_namespace, revision_id, metadata, created_at
         FROM translation_events 
+        ${whereSql}
+        ORDER BY ${sortCol} ${orderDirection}
+        LIMIT ? OFFSET ?
       `;
-      const params = [];
+      const dataParams = [...params, limit, offset];
+      const rows = await query(dataSql, dataParams);
 
-      if (userFilter) {
-        sql += ` WHERE wiki_user = ? `;
-        params.push(userFilter);
-      }
-
-      sql += ` ORDER BY created_at DESC LIMIT ? `;
-      params.push(limit);
-
-      const rows = await query(sql, params);
-
-      return rows.map(r => ({
+      const events = rows.map(r => ({
         id: r.id,
         sessionId: r.session_id,
         wikiUser: r.wiki_user,
@@ -308,9 +434,240 @@ export const analyticsService = {
         metadata: r.metadata,
         createdAt: r.created_at,
       }));
+
+      Object.assign(events, {
+        total,
+        page,
+        limit,
+        totalPages,
+      });
+
+      return events;
     } catch (err) {
       console.error('[Analytics] Error fetching recent events:', err);
-      return inMemoryEvents.slice(0, limit);
+      const fallback = inMemoryEvents.slice(0, limit);
+      Object.assign(fallback, { total: fallback.length, page: 1, limit, totalPages: 1 });
+      return fallback;
+    }
+  },
+
+  /**
+   * Get detailed analytics for an individual contributor.
+   */
+  async getUserDetails(username) {
+    if (!username) return null;
+
+    if (!isDatabaseConnected()) {
+      const userEvents = inMemoryEvents.filter(
+        e => e.wikiUser && e.wikiUser.toLowerCase() === username.toLowerCase()
+      );
+
+      if (!userEvents.length) {
+        return {
+          wikiUser: username,
+          totals: {
+            totalEvents: 0,
+            publishes: 0,
+            translates: 0,
+            exportsAndCopies: 0,
+            totalWords: 0,
+            totalChars: 0,
+            totalSections: 0,
+            firstActive: null,
+            lastActive: null,
+          },
+          languages: [],
+          engines: [],
+          namespaces: [],
+          recentArticles: [],
+        };
+      }
+
+      let publishes = 0;
+      let translates = 0;
+      let exportsAndCopies = 0;
+      let totalWords = 0;
+      let totalChars = 0;
+      let totalSections = 0;
+      const langMap = {};
+      const engineMap = {};
+      const namespaceMap = {};
+
+      userEvents.forEach(e => {
+        if (e.eventType === 'publish') publishes++;
+        else if (e.eventType === 'translate') translates++;
+        else if (e.eventType === 'copy' || e.eventType === 'export') exportsAndCopies++;
+
+        totalWords += (e.wordCount || 0);
+        totalChars += (e.charCount || 0);
+        totalSections += (e.sectionCount || 0);
+
+        const langPair = `${e.sourceLang || 'en'} → ${e.targetLang || 'unknown'}`;
+        if (!langMap[langPair]) {
+          langMap[langPair] = { pair: langPair, targetLang: e.targetLang, count: 0, words: 0 };
+        }
+        langMap[langPair].count++;
+        langMap[langPair].words += (e.wordCount || 0);
+
+        if (e.mtEngine) {
+          engineMap[e.mtEngine] = (engineMap[e.mtEngine] || 0) + 1;
+        }
+
+        if (e.targetNamespace) {
+          namespaceMap[e.targetNamespace] = (namespaceMap[e.targetNamespace] || 0) + 1;
+        }
+      });
+
+      const formattedLanguages = Object.values(langMap).sort((a, b) => b.count - a.count);
+      const formattedEngines = Object.entries(engineMap).map(([engine, count]) => ({ engine, count })).sort((a, b) => b.count - a.count);
+      const formattedNamespaces = Object.entries(namespaceMap).map(([namespace, count]) => ({ namespace, count }));
+      const formattedRecentArticles = userEvents.slice(0, 50).map(e => ({
+        id: e.id,
+        eventType: e.eventType,
+        sourceLang: e.sourceLang,
+        targetLang: e.targetLang,
+        sourceTitle: e.sourceTitle,
+        targetTitle: e.targetTitle,
+        wordCount: e.wordCount,
+        revisionId: e.revisionId,
+        targetNamespace: e.targetNamespace,
+        diffUrl: e.revisionId && e.targetLang ? `https://${e.targetLang}.wikipedia.org/w/index.php?diff=${e.revisionId}` : null,
+        createdAt: e.createdAt,
+      }));
+
+      return {
+        wikiUser: username,
+        username: username,
+        totals: {
+          totalEvents: userEvents.length,
+          publishes,
+          translates,
+          exportsAndCopies,
+          totalWords,
+          totalChars,
+          totalSections,
+          firstActive: userEvents[userEvents.length - 1]?.createdAt || null,
+          lastActive: userEvents[0]?.createdAt || null,
+        },
+        languages: formattedLanguages,
+        languagePairs: formattedLanguages,
+        engines: formattedEngines,
+        mtEngines: formattedEngines,
+        namespaces: formattedNamespaces,
+        recentArticles: formattedRecentArticles,
+      };
+    }
+
+    try {
+      // 1. User totals
+      const [totalsRow] = await query(`
+        SELECT 
+          COUNT(*) as total_events,
+          COUNT(CASE WHEN event_type = 'publish' THEN 1 END) as publishes,
+          COUNT(CASE WHEN event_type = 'translate' THEN 1 END) as translates,
+          COUNT(CASE WHEN event_type IN ('copy', 'export') THEN 1 END) as exports_and_copies,
+          COALESCE(SUM(word_count), 0) as total_words,
+          COALESCE(SUM(char_count), 0) as total_chars,
+          COALESCE(SUM(section_count), 0) as total_sections,
+          MIN(created_at) as first_active,
+          MAX(created_at) as last_active
+        FROM translation_events
+        WHERE wiki_user = ?
+      `, [username]);
+
+      // 2. Language pairs breakdown
+      const langRows = await query(`
+        SELECT 
+          CONCAT(source_lang, ' → ', target_lang) as pair,
+          target_lang,
+          COUNT(*) as count,
+          COALESCE(SUM(word_count), 0) as words
+        FROM translation_events
+        WHERE wiki_user = ?
+        GROUP BY source_lang, target_lang
+        ORDER BY count DESC
+      `, [username]);
+
+      // 3. Engine breakdown
+      const engineRows = await query(`
+        SELECT mt_engine as engine, COUNT(*) as count
+        FROM translation_events
+        WHERE wiki_user = ? AND mt_engine IS NOT NULL AND mt_engine != ''
+        GROUP BY mt_engine
+        ORDER BY count DESC
+      `, [username]);
+
+      // 4. Namespace breakdown
+      const namespaceRows = await query(`
+        SELECT COALESCE(target_namespace, 'mainspace') as namespace, COUNT(*) as count
+        FROM translation_events
+        WHERE wiki_user = ? AND event_type = 'publish'
+        GROUP BY target_namespace
+      `, [username]);
+
+      // 5. Recent articles
+      const recentRows = await query(`
+        SELECT 
+          id, event_type, source_lang, target_lang, source_title, target_title,
+          word_count, revision_id, target_namespace, created_at
+        FROM translation_events
+        WHERE wiki_user = ?
+        ORDER BY created_at DESC
+        LIMIT 50
+      `, [username]);
+
+      const mysqlLanguages = langRows.map(r => ({
+        pair: r.pair,
+        targetLang: r.target_lang,
+        count: Number(r.count),
+        words: Number(r.words),
+      }));
+      const mysqlEngines = engineRows.map(r => ({
+        engine: r.engine,
+        count: Number(r.count),
+      }));
+      const mysqlNamespaces = namespaceRows.map(r => ({
+        namespace: r.namespace,
+        count: Number(r.count),
+      }));
+      const mysqlRecentArticles = recentRows.map(r => ({
+        id: r.id,
+        eventType: r.event_type,
+        sourceLang: r.source_lang,
+        targetLang: r.target_lang,
+        sourceTitle: r.source_title,
+        targetTitle: r.target_title,
+        wordCount: r.word_count,
+        revisionId: r.revision_id,
+        targetNamespace: r.target_namespace,
+        diffUrl: r.revision_id && r.target_lang ? `https://${r.target_lang}.wikipedia.org/w/index.php?diff=${r.revision_id}` : null,
+        createdAt: r.created_at,
+      }));
+
+      return {
+        wikiUser: username,
+        username: username,
+        totals: {
+          totalEvents: Number(totalsRow?.total_events || 0),
+          publishes: Number(totalsRow?.publishes || 0),
+          translates: Number(totalsRow?.translates || 0),
+          exportsAndCopies: Number(totalsRow?.exports_and_copies || 0),
+          totalWords: Number(totalsRow?.total_words || 0),
+          totalChars: Number(totalsRow?.total_chars || 0),
+          totalSections: Number(totalsRow?.total_sections || 0),
+          firstActive: totalsRow?.first_active || null,
+          lastActive: totalsRow?.last_active || null,
+        },
+        languages: mysqlLanguages,
+        languagePairs: mysqlLanguages,
+        engines: mysqlEngines,
+        mtEngines: mysqlEngines,
+        namespaces: mysqlNamespaces,
+        recentArticles: mysqlRecentArticles,
+      };
+    } catch (err) {
+      console.error(`[Analytics] Error computing details for user ${username}:`, err);
+      return null;
     }
   },
 };

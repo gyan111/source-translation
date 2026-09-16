@@ -134,7 +134,7 @@
                 <span class="material-icons text-amber-400 text-lg">military_tech</span>
                 <h3 class="text-sm font-bold text-gray-200">Top Contributors Leaderboard</h3>
               </div>
-              <span class="text-xs text-gray-400">Click any user to filter their activity</span>
+              <span class="text-xs text-gray-400">Click any user card to view detailed contributor profile</span>
             </div>
 
             <div v-if="!stats.summary?.topContributors?.length" class="text-xs text-gray-500 py-6 text-center">
@@ -145,9 +145,9 @@
               <div 
                 v-for="(editor, index) in stats.summary.topContributors" 
                 :key="editor.wikiUser"
-                @click="filterByUser(editor.wikiUser)"
-                class="p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between"
-                :class="selectedUser === editor.wikiUser ? 'bg-indigo-950/50 border-indigo-500 shadow-md ring-1 ring-indigo-500' : 'bg-gray-800/70 hover:bg-gray-800 border-gray-750 hover:border-gray-600'"
+                @click="openUserDetails(editor.wikiUser)"
+                class="p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group hover:border-indigo-500/60 hover:shadow-lg hover:shadow-indigo-500/5"
+                :class="selectedUser === editor.wikiUser ? 'bg-indigo-950/50 border-indigo-500 shadow-md ring-1 ring-indigo-500' : 'bg-gray-800/70 hover:bg-gray-800 border-gray-750'"
               >
                 <div class="flex items-center space-x-3 truncate">
                   <!-- Rank Badge -->
@@ -163,8 +163,9 @@
                     {{ index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}` }}
                   </div>
                   <div class="truncate">
-                    <div class="text-xs font-bold text-indigo-300 truncate">
-                      {{ editor.wikiUser }}
+                    <div class="text-xs font-bold text-indigo-300 group-hover:text-indigo-200 truncate flex items-center space-x-1.5">
+                      <span>{{ editor.wikiUser }}</span>
+                      <span class="material-icons text-[12px] opacity-0 group-hover:opacity-100 text-indigo-400 transition-opacity">account_circle</span>
                     </div>
                     <div class="text-[10px] text-gray-400 flex items-center space-x-2 mt-0.5">
                       <span>{{ editor.publishes }} published</span>
@@ -174,7 +175,15 @@
                   </div>
                 </div>
 
-                <div class="flex items-center space-x-1.5 shrink-0">
+                <div class="flex items-center space-x-1 shrink-0">
+                  <button
+                    @click.stop="filterByUser(editor.wikiUser)"
+                    class="p-1 rounded-lg text-gray-400 hover:text-indigo-300 hover:bg-gray-700/60 transition-colors"
+                    :class="{ 'text-indigo-400 bg-indigo-500/20': selectedUser === editor.wikiUser }"
+                    title="Filter activity table by this editor"
+                  >
+                    <span class="material-icons text-sm">filter_alt</span>
+                  </button>
                   <a 
                     :href="`https://meta.wikimedia.org/wiki/Special:Contributions/${encodeURIComponent(editor.wikiUser)}`" 
                     target="_blank" 
@@ -185,7 +194,7 @@
                   >
                     <span class="material-icons text-sm">open_in_new</span>
                   </a>
-                  <span class="material-icons text-gray-500 text-sm">arrow_forward</span>
+                  <span class="material-icons text-gray-500 text-sm group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all">chevron_right</span>
                 </div>
               </div>
             </div>
@@ -284,67 +293,221 @@
 
           </div>
 
-          <!-- Section: Activity Feed with User Filter -->
+          <!-- Section: Activity Feed with User Filter, Search, Language Filter, Sorting & Pagination -->
           <div class="p-5 bg-gray-850/80 border border-gray-700/60 rounded-xl space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div class="flex items-center space-x-2">
+            
+            <!-- Controls Header: Title, Search, Language, Action Tabs -->
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div class="flex items-center space-x-2 shrink-0">
                 <span class="material-icons text-base text-emerald-400">history</span>
                 <h3 class="text-sm font-semibold text-gray-200">Recent Translation & Publish Activity</h3>
-                
-                <!-- Active User Filter Tag -->
-                <div v-if="selectedUser" class="ml-2 inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-medium">
-                  <span>User: {{ selectedUser }}</span>
-                  <button @click="clearUserFilter" class="hover:text-white ml-1 cursor-pointer">✕</button>
-                </div>
               </div>
               
-              <!-- Filter Tabs -->
-              <div class="flex items-center space-x-1 bg-gray-800 p-1 rounded-lg text-[11px]">
-                <button 
-                  v-for="filter in ['all', 'publish', 'translate', 'export']" 
-                  :key="filter"
-                  @click="activeFilter = filter"
-                  class="px-2.5 py-1 rounded capitalize transition-colors cursor-pointer"
-                  :class="activeFilter === filter ? 'bg-indigo-600 text-white font-medium shadow-sm' : 'text-gray-400 hover:text-gray-200'"
-                >
-                  {{ filter === 'export' ? 'Exports / Copies' : filter }}
-                </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <!-- Search Input -->
+                <div class="relative min-w-[200px] flex-1 sm:flex-initial">
+                  <span class="material-icons absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-sm">search</span>
+                  <input 
+                    v-model="searchQuery" 
+                    @input="onSearchInput"
+                    type="text" 
+                    placeholder="Search title or user..." 
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-7 py-1.5 text-xs text-gray-200 placeholder-gray-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                  />
+                  <button 
+                    v-if="searchQuery" 
+                    @click="clearSearch"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 cursor-pointer"
+                  >
+                    <span class="material-icons text-xs">close</span>
+                  </button>
+                </div>
+
+                <!-- Target Language Filter Dropdown -->
+                <div class="relative">
+                  <select 
+                    v-model="selectedLanguage" 
+                    @change="onLanguageChange"
+                    class="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 cursor-pointer appearance-none pr-7"
+                  >
+                    <option value="all">All Target Languages</option>
+                    <option v-for="lang in availableLanguages" :key="lang" :value="lang">
+                      {{ lang.toUpperCase() }}
+                    </option>
+                  </select>
+                  <span class="material-icons absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none">arrow_drop_down</span>
+                </div>
+
+                <!-- Filter Tabs -->
+                <div class="flex items-center space-x-1 bg-gray-800 p-1 rounded-lg text-[11px]">
+                  <button 
+                    v-for="filter in ['all', 'publish', 'translate', 'export']" 
+                    :key="filter"
+                    @click="setActiveFilter(filter)"
+                    class="px-2.5 py-1 rounded capitalize transition-colors cursor-pointer"
+                    :class="activeFilter === filter ? 'bg-indigo-600 text-white font-medium shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+                  >
+                    {{ filter === 'export' ? 'Exports / Copies' : filter }}
+                  </button>
+                </div>
               </div>
+            </div>
+
+            <!-- Active Filters Chips -->
+            <div v-if="hasActiveFilters" class="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-800/60">
+              <span class="text-[11px] text-gray-500">Active filters:</span>
+              
+              <!-- User Filter Chip -->
+              <span v-if="selectedUser" class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-medium">
+                <span>User: {{ selectedUser }}</span>
+                <button @click="clearUserFilter" class="hover:text-white ml-1 cursor-pointer">✕</button>
+              </span>
+
+              <!-- Action Filter Chip -->
+              <span v-if="activeFilter !== 'all'" class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-medium capitalize">
+                <span>Action: {{ activeFilter }}</span>
+                <button @click="setActiveFilter('all')" class="hover:text-white ml-1 cursor-pointer">✕</button>
+              </span>
+
+              <!-- Target Language Chip -->
+              <span v-if="selectedLanguage !== 'all'" class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-medium">
+                <span>Target: {{ selectedLanguage.toUpperCase() }}</span>
+                <button @click="clearLanguageFilter" class="hover:text-white ml-1 cursor-pointer">✕</button>
+              </span>
+
+              <!-- Search Query Chip -->
+              <span v-if="searchQuery" class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-medium">
+                <span>"{{ searchQuery }}"</span>
+                <button @click="clearSearch" class="hover:text-white ml-1 cursor-pointer">✕</button>
+              </span>
+
+              <!-- Reset All Filters -->
+              <button 
+                @click="resetAllFilters" 
+                class="text-[11px] text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer ml-1"
+              >
+                Reset all
+              </button>
             </div>
 
             <!-- Events Table -->
             <div class="overflow-x-auto">
               <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr class="border-b border-gray-750 text-gray-400 font-medium uppercase text-[10px] tracking-wider">
-                    <th class="py-2.5 px-3">Time</th>
-                    <th class="py-2.5 px-3">User</th>
-                    <th class="py-2.5 px-3">Action</th>
-                    <th class="py-2.5 px-3">Languages</th>
-                    <th class="py-2.5 px-3">Article Title</th>
-                    <th class="py-2.5 px-3 text-right">Details</th>
+                  <tr class="border-b border-gray-750 text-gray-400 font-medium uppercase text-[10px] tracking-wider select-none">
+                    <!-- Column: Time -->
+                    <th 
+                      @click="toggleSort('createdAt')" 
+                      class="py-2.5 px-3 cursor-pointer hover:text-white transition-colors group"
+                      title="Sort by time"
+                    >
+                      <div class="flex items-center space-x-1">
+                        <span>Time</span>
+                        <span class="material-icons text-xs" :class="sortBy === 'createdAt' ? 'text-indigo-400' : 'text-gray-600 opacity-40 group-hover:opacity-100'">
+                          {{ sortBy === 'createdAt' ? (sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}
+                        </span>
+                      </div>
+                    </th>
+
+                    <!-- Column: User -->
+                    <th 
+                      @click="toggleSort('wikiUser')" 
+                      class="py-2.5 px-3 cursor-pointer hover:text-white transition-colors group"
+                      title="Sort by user"
+                    >
+                      <div class="flex items-center space-x-1">
+                        <span>User</span>
+                        <span class="material-icons text-xs" :class="sortBy === 'wikiUser' ? 'text-indigo-400' : 'text-gray-600 opacity-40 group-hover:opacity-100'">
+                          {{ sortBy === 'wikiUser' ? (sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}
+                        </span>
+                      </div>
+                    </th>
+
+                    <!-- Column: Action -->
+                    <th 
+                      @click="toggleSort('eventType')" 
+                      class="py-2.5 px-3 cursor-pointer hover:text-white transition-colors group"
+                      title="Sort by action"
+                    >
+                      <div class="flex items-center space-x-1">
+                        <span>Action</span>
+                        <span class="material-icons text-xs" :class="sortBy === 'eventType' ? 'text-indigo-400' : 'text-gray-600 opacity-40 group-hover:opacity-100'">
+                          {{ sortBy === 'eventType' ? (sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}
+                        </span>
+                      </div>
+                    </th>
+
+                    <!-- Column: Languages -->
+                    <th 
+                      @click="toggleSort('sourceLang')" 
+                      class="py-2.5 px-3 cursor-pointer hover:text-white transition-colors group"
+                      title="Sort by languages"
+                    >
+                      <div class="flex items-center space-x-1">
+                        <span>Languages</span>
+                        <span class="material-icons text-xs" :class="sortBy === 'sourceLang' ? 'text-indigo-400' : 'text-gray-600 opacity-40 group-hover:opacity-100'">
+                          {{ sortBy === 'sourceLang' ? (sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}
+                        </span>
+                      </div>
+                    </th>
+
+                    <!-- Column: Article Title -->
+                    <th 
+                      @click="toggleSort('targetTitle')" 
+                      class="py-2.5 px-3 cursor-pointer hover:text-white transition-colors group"
+                      title="Sort by article title"
+                    >
+                      <div class="flex items-center space-x-1">
+                        <span>Article Title</span>
+                        <span class="material-icons text-xs" :class="sortBy === 'targetTitle' ? 'text-indigo-400' : 'text-gray-600 opacity-40 group-hover:opacity-100'">
+                          {{ sortBy === 'targetTitle' ? (sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}
+                        </span>
+                      </div>
+                    </th>
+
+                    <!-- Column: Details / Words -->
+                    <th 
+                      @click="toggleSort('wordCount')" 
+                      class="py-2.5 px-3 text-right cursor-pointer hover:text-white transition-colors group"
+                      title="Sort by word count"
+                    >
+                      <div class="flex items-center justify-end space-x-1">
+                        <span>Details</span>
+                        <span class="material-icons text-xs" :class="sortBy === 'wordCount' ? 'text-indigo-400' : 'text-gray-600 opacity-40 group-hover:opacity-100'">
+                          {{ sortBy === 'wordCount' ? (sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}
+                        </span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800/80">
-                  <tr v-if="!filteredEvents.length">
-                    <td colspan="6" class="py-8 text-center text-gray-500 text-xs">
-                      No activity recorded matching this filter.
+                  <tr v-if="!eventsList.length">
+                    <td colspan="6" class="py-10 text-center text-gray-500 text-xs">
+                      No activity recorded matching your filters.
                     </td>
                   </tr>
-                  <tr v-for="event in filteredEvents" :key="event.id || event.createdAt" class="hover:bg-gray-800/50 transition-colors">
+                  <tr v-for="event in eventsList" :key="event.id || (event.createdAt + (event.wikiUser || '') + (event.targetTitle || ''))" class="hover:bg-gray-800/50 transition-colors">
                     <td class="py-2.5 px-3 text-gray-400 whitespace-nowrap">
                       {{ formatTime(event.createdAt) }}
                     </td>
                     <td class="py-2.5 px-3 font-medium whitespace-nowrap">
                       <div v-if="event.wikiUser && event.wikiUser !== 'anonymous'" class="inline-flex items-center space-x-1.5">
                         <span 
-                          @click="filterByUser(event.wikiUser)"
+                          @click="openUserDetails(event.wikiUser)"
                           class="text-indigo-300 hover:text-indigo-200 hover:underline cursor-pointer inline-flex items-center space-x-1"
-                          title="Filter activity by this editor"
+                          title="View contributor profile details"
                         >
                           <span>{{ event.wikiUser }}</span>
-                          <span class="material-icons text-[10px] opacity-60">filter_alt</span>
+                          <span class="material-icons text-[12px] opacity-70">account_circle</span>
                         </span>
+                        <button 
+                          @click.stop="filterByUser(event.wikiUser)"
+                          class="p-0.5 rounded text-gray-500 hover:text-indigo-300 hover:bg-gray-700/60 transition-colors cursor-pointer"
+                          :class="{ 'text-indigo-400': selectedUser === event.wikiUser }"
+                          title="Filter activity by this editor"
+                        >
+                          <span class="material-icons text-[11px]">filter_alt</span>
+                        </button>
                         <a 
                           :href="`https://${event.targetLang || 'meta'}.wikipedia.org/wiki/Special:Contributions/${encodeURIComponent(event.wikiUser)}`"
                           target="_blank"
@@ -371,7 +534,7 @@
                       <span class="text-gray-600 mx-1">→</span>
                       <span class="text-indigo-300 font-semibold">{{ event.targetLang }}</span>
                     </td>
-                    <td class="py-2.5 px-3 max-w-[200px] truncate text-gray-200" :title="event.targetTitle || event.sourceTitle">
+                    <td class="py-2.5 px-3 max-w-[220px] truncate text-gray-200" :title="event.targetTitle || event.sourceTitle">
                       {{ event.targetTitle || event.sourceTitle }}
                     </td>
                     <td class="py-2.5 px-3 text-right whitespace-nowrap">
@@ -385,13 +548,95 @@
                         <span class="material-icons text-[10px]">open_in_new</span>
                       </a>
                       <span v-else-if="event.wordCount" class="text-gray-500 text-[11px]">
-                        {{ event.wordCount }} words
+                        {{ formatNumber(event.wordCount) }} words
                       </span>
                       <span v-else class="text-gray-600 text-[11px]">—</span>
                     </td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pt-4 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-gray-400">
+              <!-- Info & Page Size -->
+              <div class="flex items-center space-x-3">
+                <span>
+                  Showing 
+                  <strong class="text-gray-200 font-semibold">{{ paginationStart }}</strong>
+                  to 
+                  <strong class="text-gray-200 font-semibold">{{ paginationEnd }}</strong>
+                  of 
+                  <strong class="text-gray-200 font-semibold">{{ formatNumber(pagination.total) }}</strong>
+                  events
+                </span>
+                <div class="flex items-center space-x-1.5 border-l border-gray-700 pl-3">
+                  <span>Rows per page:</span>
+                  <select 
+                    v-model="pageSize" 
+                    @change="onPageSizeChange(pageSize)"
+                    class="bg-gray-800 border border-gray-700 text-gray-200 text-xs rounded px-2 py-1 outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option :value="10">10</option>
+                    <option :value="25">25</option>
+                    <option :value="50">50</option>
+                    <option :value="100">100</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Pagination Controls -->
+              <div class="flex items-center space-x-1 self-center sm:self-auto">
+                <button 
+                  @click="changePage(1)" 
+                  :disabled="currentPage === 1"
+                  class="p-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="First Page"
+                >
+                  <span class="material-icons text-sm">first_page</span>
+                </button>
+                <button 
+                  @click="changePage(currentPage - 1)" 
+                  :disabled="currentPage === 1"
+                  class="px-2 py-1 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center space-x-1"
+                  title="Previous Page"
+                >
+                  <span class="material-icons text-sm">chevron_left</span>
+                  <span>Prev</span>
+                </button>
+
+                <!-- Page Buttons -->
+                <div class="flex items-center space-x-1 px-1">
+                  <button 
+                    v-for="(p, i) in visiblePages" 
+                    :key="i"
+                    @click="typeof p === 'number' && changePage(p)"
+                    :disabled="typeof p !== 'number'"
+                    class="min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-semibold flex items-center justify-center transition-colors"
+                    :class="p === currentPage ? 'bg-indigo-600 text-white shadow-sm' : typeof p === 'number' ? 'border border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer' : 'text-gray-600 cursor-default'"
+                  >
+                    {{ p }}
+                  </button>
+                </div>
+
+                <button 
+                  @click="changePage(currentPage + 1)" 
+                  :disabled="currentPage >= pagination.totalPages"
+                  class="px-2 py-1 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center space-x-1"
+                  title="Next Page"
+                >
+                  <span>Next</span>
+                  <span class="material-icons text-sm">chevron_right</span>
+                </button>
+                <button 
+                  @click="changePage(pagination.totalPages)" 
+                  :disabled="currentPage >= pagination.totalPages"
+                  class="p-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="Last Page"
+                >
+                  <span class="material-icons text-sm">last_page</span>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -412,11 +657,20 @@
       </div>
 
     </div>
+
+    <!-- Contributor Profile Details Modal -->
+    <ContributorDetailsModal
+      :isOpen="showUserModal"
+      :username="selectedDetailUser"
+      @close="showUserModal = false"
+      @filter-by-user="handleFilterByUserFromModal"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
+import ContributorDetailsModal from './ContributorDetailsModal.vue';
 
 const props = defineProps({
   isOpen: {
@@ -430,17 +684,118 @@ const emit = defineEmits(['close']);
 const stats = ref(null);
 const loading = ref(false);
 const error = ref(null);
+
+// Filtering & Sorting State
 const activeFilter = ref('all');
 const selectedUser = ref(null);
+const selectedLanguage = ref('all');
+const searchQuery = ref('');
+const sortBy = ref('createdAt');
+const sortOrder = ref('desc');
+
+// Pagination State
+const currentPage = ref(1);
+const pageSize = ref(25);
+const pagination = ref({
+  total: 0,
+  totalPages: 1,
+  page: 1,
+  limit: 25,
+});
+
+// Contributor Details Modal State
+const selectedDetailUser = ref(null);
+const showUserModal = ref(false);
+
+const openUserDetails = (username) => {
+  if (!username || username === 'anonymous') return;
+  selectedDetailUser.value = username;
+  showUserModal.value = true;
+};
+
+const handleFilterByUserFromModal = (username) => {
+  showUserModal.value = false;
+  filterByUser(username);
+};
+
+// Available target languages for the filter dropdown
+const availableLanguages = computed(() => {
+  const set = new Set();
+  if (stats.value?.summary?.languageDistribution) {
+    stats.value.summary.languageDistribution.forEach(l => {
+      if (l.language) set.add(l.language.toLowerCase());
+    });
+  }
+  if (stats.value?.recentEvents) {
+    stats.value.recentEvents.forEach(e => {
+      if (e.targetLang) set.add(e.targetLang.toLowerCase());
+    });
+  }
+  return Array.from(set).sort();
+});
+
+const hasActiveFilters = computed(() => {
+  return (
+    !!selectedUser.value ||
+    activeFilter.value !== 'all' ||
+    selectedLanguage.value !== 'all' ||
+    !!searchQuery.value.trim()
+  );
+});
+
+const eventsList = computed(() => {
+  return stats.value?.recentEvents || [];
+});
+
+const paginationStart = computed(() => {
+  if (!pagination.value.total) return 0;
+  return (currentPage.value - 1) * pageSize.value + 1;
+});
+
+const paginationEnd = computed(() => {
+  if (!pagination.value.total) return 0;
+  return Math.min(currentPage.value * pageSize.value, pagination.value.total);
+});
+
+const visiblePages = computed(() => {
+  const total = pagination.value.totalPages || 1;
+  const current = currentPage.value;
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages = [];
+  pages.push(1);
+  if (current > 3) {
+    pages.push('...');
+  }
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) {
+    pages.push(i);
+  }
+  if (current < total - 2) {
+    pages.push('...');
+  }
+  pages.push(total);
+  return pages;
+});
 
 const fetchStats = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const url = selectedUser.value 
-      ? `/api/admin/stats?user=${encodeURIComponent(selectedUser.value)}`
-      : '/api/admin/stats';
-    const res = await fetch(url);
+    const params = new URLSearchParams();
+    params.set('page', currentPage.value.toString());
+    params.set('limit', pageSize.value.toString());
+    params.set('sortBy', sortBy.value);
+    params.set('sortOrder', sortOrder.value);
+
+    if (selectedUser.value) params.set('user', selectedUser.value);
+    if (activeFilter.value !== 'all') params.set('eventType', activeFilter.value);
+    if (selectedLanguage.value && selectedLanguage.value !== 'all') params.set('targetLang', selectedLanguage.value);
+    if (searchQuery.value && searchQuery.value.trim()) params.set('search', searchQuery.value.trim());
+
+    const res = await fetch(`/api/admin/stats?${params.toString()}`);
     if (!res.ok) {
       if (res.status === 403) {
         throw new Error('You do not have administrative privileges to view analytics.');
@@ -449,6 +804,17 @@ const fetchStats = async () => {
     }
     const data = await res.json();
     stats.value = data;
+    
+    if (data.pagination) {
+      pagination.value = data.pagination;
+    } else {
+      pagination.value = {
+        total: data.recentEvents?.length || 0,
+        page: currentPage.value,
+        limit: pageSize.value,
+        totalPages: Math.max(1, Math.ceil((data.recentEvents?.length || 0) / pageSize.value)),
+      };
+    }
   } catch (err) {
     error.value = err.message;
   } finally {
@@ -465,11 +831,77 @@ watch(() => props.isOpen, (open) => {
 const filterByUser = (username) => {
   if (!username || username === 'anonymous') return;
   selectedUser.value = username;
+  currentPage.value = 1;
   fetchStats();
 };
 
 const clearUserFilter = () => {
   selectedUser.value = null;
+  currentPage.value = 1;
+  fetchStats();
+};
+
+const setActiveFilter = (filter) => {
+  activeFilter.value = filter;
+  currentPage.value = 1;
+  fetchStats();
+};
+
+const onLanguageChange = () => {
+  currentPage.value = 1;
+  fetchStats();
+};
+
+const clearLanguageFilter = () => {
+  selectedLanguage.value = 'all';
+  currentPage.value = 1;
+  fetchStats();
+};
+
+let searchDebounceTimer = null;
+const onSearchInput = () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    currentPage.value = 1;
+    fetchStats();
+  }, 300);
+};
+
+const clearSearch = () => {
+  searchQuery.value = '';
+  currentPage.value = 1;
+  fetchStats();
+};
+
+const resetAllFilters = () => {
+  selectedUser.value = null;
+  activeFilter.value = 'all';
+  selectedLanguage.value = 'all';
+  searchQuery.value = '';
+  currentPage.value = 1;
+  fetchStats();
+};
+
+const toggleSort = (column) => {
+  if (sortBy.value === column) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortBy.value = column;
+    sortOrder.value = column === 'createdAt' || column === 'wordCount' ? 'desc' : 'asc';
+  }
+  currentPage.value = 1;
+  fetchStats();
+};
+
+const changePage = (page) => {
+  if (page < 1 || page > (pagination.value.totalPages || 1) || page === currentPage.value) return;
+  currentPage.value = page;
+  fetchStats();
+};
+
+const onPageSizeChange = (size) => {
+  pageSize.value = Number(size);
+  currentPage.value = 1;
   fetchStats();
 };
 
@@ -515,18 +947,6 @@ const getActionBadgeClass = (eventType) => {
       return 'bg-gray-500/10 border border-gray-500/30 text-gray-400';
   }
 };
-
-const filteredEvents = computed(() => {
-  let events = stats.value?.recentEvents || [];
-  if (selectedUser.value) {
-    events = events.filter(e => e.wikiUser && e.wikiUser.toLowerCase() === selectedUser.value.toLowerCase());
-  }
-  if (activeFilter.value === 'all') return events;
-  if (activeFilter.value === 'export') {
-    return events.filter(e => e.eventType === 'copy' || e.eventType === 'export');
-  }
-  return events.filter(e => e.eventType === activeFilter.value);
-});
 </script>
 
 <style scoped>

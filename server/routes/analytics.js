@@ -61,20 +61,77 @@ router.get('/admin/stats', async (req, res) => {
   }
 
   try {
-    const userFilter = req.query.user ? req.query.user.trim() : null;
+    const {
+      page = 1,
+      limit = 25,
+      user,
+      eventType,
+      targetLang,
+      engine,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    const userFilter = user ? user.trim() : null;
     const [summary, recentEvents] = await Promise.all([
       analyticsService.getStatsSummary(),
-      analyticsService.getRecentEvents(100, userFilter),
+      analyticsService.getRecentEvents({
+        page: parseInt(page, 10) || 1,
+        limit: parseInt(limit, 10) || 25,
+        userFilter,
+        eventType: eventType ? eventType.trim() : null,
+        targetLang: targetLang ? targetLang.trim() : null,
+        mtEngine: engine ? engine.trim() : null,
+        search: search ? search.trim() : null,
+        sortBy: sortBy ? sortBy.trim() : 'createdAt',
+        sortOrder: sortOrder ? sortOrder.trim() : 'desc',
+      }),
     ]);
 
     res.json({
       success: true,
       summary,
       recentEvents,
+      pagination: {
+        total: recentEvents.total ?? recentEvents.length,
+        page: recentEvents.page ?? 1,
+        limit: recentEvents.limit ?? 25,
+        totalPages: recentEvents.totalPages ?? 1,
+      },
     });
   } catch (error) {
     console.error('Admin stats error:', error);
     res.status(500).json({ error: 'Failed to retrieve stats' });
+  }
+});
+
+// Admin-only endpoint to fetch detailed analytics for a specific contributor
+router.get('/admin/user/:username', async (req, res) => {
+  const adminName = req.session?.user?.username;
+
+  if (!adminName || !isAdminUser(adminName)) {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Access restricted to tool administrators.',
+    });
+  }
+
+  try {
+    const { username } = req.params;
+    const userDetails = await analyticsService.getUserDetails(username);
+
+    if (!userDetails) {
+      return res.status(404).json({ error: 'User not found or no records available.' });
+    }
+
+    res.json({
+      success: true,
+      userDetails,
+    });
+  } catch (error) {
+    console.error('Admin user details error:', error);
+    res.status(500).json({ error: 'Failed to retrieve user details' });
   }
 });
 

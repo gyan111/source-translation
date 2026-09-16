@@ -73,11 +73,19 @@ export async function refreshWikimediaToken(sessionUser) {
  * @returns {Promise<string|null>} Valid access token or null if session is invalid
  */
 export async function validateOrRefreshToken(req) {
-  if (!req.session || !req.session.user || !req.session.user.accessToken) {
+  if (!req.session || !req.session.user) {
     return null;
   }
 
   const user = req.session.user;
+  if (user.isDev && process.env.NODE_ENV !== 'production') {
+    return user.accessToken || 'dev-token';
+  }
+
+  if (!user.accessToken) {
+    return null;
+  }
+
   const now = Date.now();
 
   // If token is expiring within 5 minutes or already expired

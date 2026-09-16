@@ -162,4 +162,30 @@ router.get('/user', async (req, res) => {
   }
 });
 
+// Development-only authentication mock endpoint
+if (process.env.NODE_ENV !== 'production') {
+  router.post('/dev-login', (req, res) => {
+    const username = req.body?.username || 'Jnanaranjan_sahu';
+    req.session.user = {
+      username,
+      id: 12345,
+      accessToken: 'dev-token',
+      isDev: true,
+      expiresAt: Date.now() + 86400 * 1000,
+    };
+    req.session.save((err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({
+        success: true,
+        user: {
+          username,
+          id: 12345,
+          canPublishMainspace: isVerifiedUser(username),
+          isAdmin: isAdminUser(username),
+        },
+      });
+    });
+  });
+}
+
 export default router;
