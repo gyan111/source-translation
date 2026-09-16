@@ -660,7 +660,7 @@ export function reassembleWikitext(
             if (parenMatch && parenMatch[1].trim()) {
               display = cleanLink(parenMatch[1]);
             }
-            if (!display || display === newTarget) {
+            if (!display || display === newTarget || display === seg.target) {
               parts.push(`[[${newTarget}]]`);
             } else {
               parts.push(`[[${newTarget}|${display}]]`);
@@ -705,7 +705,7 @@ export function reassembleWikitext(
               } else {
                 parts.push(`[[${translatedTarget}]]`);
               }
-            } else if (hasUnresolvedTranslation && translatedTarget !== translatedDisplay && translatedDisplay) {
+            } else if (hasUnresolvedTranslation && translatedTarget !== translatedDisplay && translatedDisplay && translatedDisplay !== seg.target) {
               parts.push(`[[${translatedTarget}|${translatedDisplay}]]`);
             } else {
               const parenMatch = translatedTarget.match(/^(.+?)\s*\([^)]+\)$/);

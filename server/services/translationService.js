@@ -545,9 +545,18 @@ export const LANGUAGE_SPECS = {
 /**
  * Builds a clear, culturally accurate system prompt for LLMs (Gemini, Groq, OpenAI).
  */
-export function buildLlmSystemInstruction(fromLang, toLang) {
-  const fromSpec = LANGUAGE_SPECS[fromLang] || { name: fromLang };
-  const toSpec = LANGUAGE_SPECS[toLang] || { name: toLang };
+export function buildLlmSystemInstruction(fromLang, toLang, options = {}) {
+  const getLangName = (code) => {
+    try {
+      const dn = new Intl.DisplayNames(['en'], { type: 'language' });
+      return dn.of(code) || code;
+    } catch {
+      return code;
+    }
+  };
+
+  const fromSpec = LANGUAGE_SPECS[fromLang] || { name: getLangName(fromLang) };
+  const toSpec = LANGUAGE_SPECS[toLang] || { name: getLangName(toLang) };
 
   const fromDesc = fromSpec.script ? `${fromSpec.name} (${fromSpec.script})` : fromSpec.name;
   const toDesc = toSpec.script ? `${toSpec.name} (${toSpec.script})` : toSpec.name;
@@ -556,7 +565,24 @@ export function buildLlmSystemInstruction(fromLang, toLang) {
   prompt += `IMPORTANT RULES:\n`;
   prompt += `- Translate naturally into fluent, grammatically correct ${toSpec.name}.\n`;
   prompt += `- Preserve ALL wiki formatting: bold ('''), italic (''), headings (==), lists (*, #), template calls ({{...}}), and citations (<ref>...</ref>) exactly in place.\n`;
-  prompt += `- For [[wikilinks]], preserve link syntax [[Target|Display]]. If the target has no established translated name, keep the target and translate display text if appropriate.\n`;
+  prompt += `- For [[wikilinks]]:\n`;
+  prompt += `  * ALL article titles, link targets, and link display texts MUST be fully localized into ${toDesc}.\n`;
+  if (toSpec.script) {
+    prompt += `  * Since ${toSpec.name} uses ${toSpec.script}, ALL link targets, names, and titles inside [[wikilinks]] MUST be written in ${toSpec.script} (transliterate foreign names if needed, e.g. [[Prakash Raj]] -> [[Title in ${toSpec.script}]]). Never leave English Latin text inside [[wikilinks]].\n`;
+  } else {
+    prompt += `  * For persons, places, film names, concepts, or terms without an existing translated article, adapt or localize the title into ${toSpec.name} following ${toSpec.name} Wikipedia conventions.\n`;
+  }
+  prompt += `  * If an existing link target is already in ${toDesc}, keep that target intact.\n`;
+  prompt += `  * Use clean syntax: write [[Title]] if target and display text are the same. Never write redundant [[Title|Title]]. Only use [[Target|Display]] if the display text genuinely differs from the target article title in ${toSpec.name}.\n`;
+
+  if (options.missingLinkStrategy === 'ill') {
+    prompt += `  * For unlinked/missing foreign articles, format as {{ill|Translated Title|${fromLang}|Original English Title}}.\n`;
+  } else if (options.missingLinkStrategy === 'plain') {
+    prompt += `  * For unlinked/missing foreign articles, remove the brackets and output plain translated text without [[ ]].\n`;
+  } else if (options.missingLinkStrategy === 'keep_source') {
+    prompt += `  * For unlinked/missing foreign articles, keep the English target with translated display: [[Original Title|Translated Display]].\n`;
+  }
+
   if (toSpec.extra) {
     prompt += `- ${toSpec.extra}\n`;
   }
@@ -608,7 +634,7 @@ async function openaiTranslate(text, fromLang, toLang, options) {
   const model = options.model || 'gpt-4o-mini';
   const endpoint = options.apiEndpoint || 'https://api.openai.com/v1/chat/completions';
 
-  const systemContent = buildLlmSystemInstruction(fromLang, toLang);
+  const systemContent = buildLlmSystemInstruction(fromLang, toLang, options);
 
   const response = await axios.post(endpoint, {
     model,
@@ -747,7 +773,7 @@ async function customOpenaiTranslate(text, fromLang, toLang, options) {
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  const systemPrompt = buildLlmSystemInstruction(fromLang, toLang);
+  const systemPrompt = buildLlmSystemInstruction(fromLang, toLang, options);
 
   const payload = {
     model,
@@ -820,7 +846,7 @@ async function groqTranslate(text, fromLang, toLang, options) {
     'llama-3.3-70b-versatile',
   ].filter(Boolean);
 
-  const systemPrompt = buildLlmSystemInstruction(fromLang, toLang);
+  const systemPrompt = buildLlmSystemInstruction(fromLang, toLang, options);
 
   let lastError = null;
   for (const model of candidateModels) {
@@ -873,7 +899,7 @@ async function geminiTranslate(text, fromLang, toLang, options) {
     'gemini-3.6-flash',
   ].filter(Boolean);
 
-  const systemInstruction = buildLlmSystemInstruction(fromLang, toLang);
+  const systemInstruction = buildLlmSystemInstruction(fromLang, toLang, options);
 
   let lastError = null;
   for (const model of candidateModels) {
@@ -931,7 +957,7 @@ async function geminiBatchTranslate(texts, fromLang, toLang, options) {
     'gemini-3.6-flash',
   ].filter(Boolean);
 
-  const baseInstruction = buildLlmSystemInstruction(fromLang, toLang);
+  const baseInstruction = buildLlmSystemInstruction(fromLang, toLang, options);
   const systemInstruction = `${baseInstruction}\nTranslate each of the input array strings into the target language.\nReturn ONLY a valid JSON array of strings containing the translations in the exact same order as the input array.`;
 
   const prompt = `${systemInstruction}\n\nInput JSON:\n${JSON.stringify(texts)}`;

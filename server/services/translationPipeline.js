@@ -21,6 +21,7 @@ import {
   parseTemplate,
   reassembleTemplate,
   isTranslatableParamValue,
+  normalizeWikitextSyntax,
 } from './wikitextParser.js';
 import {
   translateTitlesViaWikidata,
@@ -133,7 +134,7 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
       if (translated && translated !== orig) {
         const escaped = orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         preparedWikitext = preparedWikitext.replace(new RegExp(`\\[\\[${escaped}(\\|[^\\]]+)?\\]\\]`, 'g'), (m, display) => {
-          return display ? `[[${translated}${display}]]` : `[[${translated}|${orig}]]`;
+          return display ? `[[${translated}${display}]]` : `[[${translated}]]`;
         });
       }
     }
@@ -152,8 +153,9 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
       stats.timingMs.total = Date.now() - startTime;
       if (onProgress) onProgress('done', 100);
 
+      const normalizedWikitext = normalizeWikitextSyntax(translatedWikitext);
       console.log(`[Pipeline/LLM] Completed in ${stats.timingMs.total}ms — links: ${stats.linksTranslated}/${stats.linksFound}, templates: ${stats.templatesTranslated}/${stats.templatesFound}`);
-      return { translatedText: translatedWikitext, stats };
+      return { translatedText: normalizedWikitext, stats };
     } catch (llmErr) {
       console.warn(`[Pipeline/LLM] Direct LLM translation failed: ${llmErr.message}. Falling back to segmented pipeline.`);
       stats.errors.push(`LLM direct translation fallback: ${llmErr.message}`);
