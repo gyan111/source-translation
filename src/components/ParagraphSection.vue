@@ -57,6 +57,38 @@
           <span class="material-icons-round text-[11px]">{{ modificationPercent > 0 ? 'edit' : 'auto_fix_normal' }}</span>
           <span>{{ modificationPercent }}% edited</span>
         </span>
+
+        <!-- Source View Mode Switcher: Text vs Preview -->
+        <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
+          <button
+            type="button"
+            @click="setSourceView('text')"
+            :class="[
+              'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+              sourceView === 'text'
+                ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
+                : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+            ]"
+            title="View raw source wikitext"
+          >
+            <span class="material-icons-round text-[12px]">code</span>
+            <span>Wikitext</span>
+          </button>
+          <button
+            type="button"
+            @click="setSourceView('preview')"
+            :class="[
+              'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
+              sourceView === 'preview'
+                ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
+                : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
+            ]"
+            title="Preview formatted source"
+          >
+            <span class="material-icons-round text-[12px]">visibility</span>
+            <span>Preview</span>
+          </button>
+        </div>
       </div>
 
       <!-- Right Action Controls -->
@@ -146,40 +178,7 @@
             </span>
           </label>
 
-          <div class="flex items-center gap-2">
-            <!-- Source View Mode Switcher: Text vs Preview -->
-            <div class="flex bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200/60 dark:border-white/[0.06] text-[11px] font-medium">
-              <button
-                type="button"
-                @click="setSourceView('text')"
-                :class="[
-                  'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
-                  sourceView === 'text'
-                    ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 shadow-2xs font-semibold'
-                    : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
-                ]"
-                title="View raw source wikitext"
-              >
-                <span class="material-icons-round text-[12px]">code</span>
-                <span>Wikitext</span>
-              </button>
-              <button
-                type="button"
-                @click="setSourceView('preview')"
-                :class="[
-                  'px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer',
-                  sourceView === 'preview'
-                    ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-2xs font-semibold'
-                    : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
-                ]"
-                title="Preview formatted source"
-              >
-                <span class="material-icons-round text-[12px]">visibility</span>
-                <span>Preview</span>
-              </button>
-            </div>
-            <span class="text-[10px] text-slate-400 dark:text-zinc-500 font-medium hidden sm:inline">{{ $t('paragraph.readOnly') }}</span>
-          </div>
+          <span class="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">{{ $t('paragraph.readOnly') }}</span>
         </div>
         <!-- Raw Wikitext View -->
         <textarea
