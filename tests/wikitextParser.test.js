@@ -10,6 +10,8 @@ import {
   parseTemplate,
   reassembleTemplate,
   isTranslatableParamValue,
+  parseFileLink,
+  resolveOrphanReferences,
 } from '../server/services/wikitextParser.js';
 import { normalizeToAsciiDigits } from '../server/services/numeralConverter.js';
 
@@ -400,6 +402,77 @@ describe('wikitextParser', () => {
         // Bengali numerals
         expect(normalizeToAsciiDigits('২০০১')).toBe('2001');
       });
+    });
+  });
+
+  describe('parseFileLink', () => {
+    it('extracts target, options, and caption from file syntax', () => {
+      const link = '[[File:Albert Einstein Head.jpg|thumb|220px|upright|alt=Einstein smiling|Albert Einstein in 1921]]';
+      const parsed = parseFileLink(link);
+
+      expect(parsed.target).toBe('File:Albert Einstein Head.jpg');
+      expect(parsed.options).toContain('thumb');
+      expect(parsed.options).toContain('220px');
+      expect(parsed.options).toContain('upright');
+      expect(parsed.options).toContain('alt=Einstein smiling');
+      expect(parsed.caption).toBe('Albert Einstein in 1921');
+    });
+
+    it('handles files with no caption safely', () => {
+      const link = '[[File:Flag.svg|thumb|100px]]';
+      const parsed = parseFileLink(link);
+
+      expect(parsed.target).toBe('File:Flag.svg');
+      expect(parsed.options).toEqual(['thumb', '100px']);
+      expect(parsed.caption).toBeNull();
+    });
+
+    it('respects nested wikilinks within captions', () => {
+      const link = '[[File:Portrait.jpg|thumb|Einstein in [[Berlin]]]]';
+      const parsed = parseFileLink(link);
+
+      expect(parsed.target).toBe('File:Portrait.jpg');
+      expect(parsed.options).toEqual(['thumb']);
+      expect(parsed.caption).toBe('Einstein in [[Berlin]]');
+    });
+  });
+
+  describe('resolveOrphanReferences', () => {
+    it('inlines full citation definition into the first self-closing reference', () => {
+      const fullArticle = `== Introduction ==
+Einstein was born in Ulm.<ref name="bio">{{cite book | title=Biography | year=2000}}</ref>
+
+== Early Career ==
+Published four groundbreaking papers.<ref name="miracle">{{cite journal | title=Annus Mirabilis}}</ref>
+
+== Later Years ==
+Moved to Princeton.<ref name="bio" />`;
+
+      const sectionWikitext = `== Later Years ==
+Moved to Princeton in 1933.<ref name="bio" /> He continued research there.<ref name="bio" />`;
+
+      const resolved = resolveOrphanReferences(sectionWikitext, fullArticle);
+
+      // The first <ref name="bio" /> should be replaced with the full definition
+      expect(resolved).toContain('<ref name="bio">{{cite book | title=Biography | year=2000}}</ref>');
+      // The second <ref name="bio" /> should remain self-closing because the first now defines it
+      expect(resolved).toContain('there.<ref name="bio" />');
+    });
+
+    it('does not alter references if definition is already inside the section', () => {
+      const fullArticle = `== Section ==
+Einstein was born in Ulm.<ref name="bio">{{cite book | title=Biography}}</ref> and moved.<ref name="bio" />`;
+
+      const sectionWikitext = `Einstein was born in Ulm.<ref name="bio">{{cite book | title=Biography}}</ref> and moved.<ref name="bio" />`;
+
+      const resolved = resolveOrphanReferences(sectionWikitext, fullArticle);
+      expect(resolved).toBe(sectionWikitext);
+    });
+
+    it('handles empty or missing parameters safely', () => {
+      expect(resolveOrphanReferences('', '')).toBe('');
+      expect(resolveOrphanReferences('Text without refs', 'Full text')).toBe('Text without refs');
+      expect(resolveOrphanReferences('Ref without match <ref name="missing" />', 'No match here')).toBe('Ref without match <ref name="missing" />');
     });
   });
 });

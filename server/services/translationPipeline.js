@@ -167,7 +167,8 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
   stepStart = Date.now();
   const textSegments = segments.filter(s => s.type === 'text').map(s => s.content);
   const headingTexts = segments.filter(s => s.type === 'heading').map(s => s.text);
-  const allTextsToTranslate = [...new Set([...textSegments, ...headingTexts])];
+  const fileCaptions = segments.filter(s => s.type === 'file' && s.caption).map(s => s.caption);
+  const allTextsToTranslate = [...new Set([...textSegments, ...headingTexts, ...fileCaptions])];
   stats.textSegments = allTextsToTranslate.length;
 
   let translatedTextsMap = {};

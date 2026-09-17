@@ -15,7 +15,7 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const { text, language, title, sourceLanguage, sourceTitle, mtEngine, sessionId } = req.body;
+  const { text, language, title, sourceLanguage, sourceTitle, mtEngine, sessionId, section, sectiontitle } = req.body;
 
   if (!text || !language || !title) {
     return res.status(400).json({
@@ -81,12 +81,16 @@ router.post('/', async (req, res) => {
     // 2. Format edit summary with source attribution (CC BY-SA compliance)
     let editSummary = 'Created via Source Translation Tool (https://source-translation.toolforge.org)';
     if (sourceTitle && sourceLanguage) {
-      editSummary = `Translated from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`;
+      if (sectiontitle) {
+        editSummary = `/* ${sectiontitle} */ Translated section from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`;
+      } else {
+        editSummary = `Translated from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`;
+      }
     }
 
     // 3. Publish Edit with OAuth Bearer Token & User-Agent
     const editUrl = `https://${language}.wikipedia.org/w/api.php`;
-    const editParams = new URLSearchParams({
+    const editPayload = {
       action: 'edit',
       title: title,
       text: text,
@@ -94,7 +98,16 @@ router.post('/', async (req, res) => {
       format: 'json',
       token: csrfToken,
       assert: 'user',
-    });
+    };
+
+    if (section !== undefined && section !== null && section !== '') {
+      editPayload.section = String(section);
+      if (sectiontitle && String(section) === 'new') {
+        editPayload.sectiontitle = sectiontitle;
+      }
+    }
+
+    const editParams = new URLSearchParams(editPayload);
 
     const editResponse = await fetch(editUrl, {
       method: 'POST',

@@ -211,4 +211,64 @@ describe('Publish Route (/publish)', () => {
     expect(oauthService.refreshWikimediaToken).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
+
+  it('passes section and sectiontitle parameters to MediaWiki edit API when publishing a section', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'TestUser',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: 'Section text content',
+        language: 'hi',
+        title: 'Draft:Albert_Einstein',
+        sourceTitle: 'Albert Einstein',
+        sourceLanguage: 'en',
+        section: 'new',
+        sectiontitle: 'प्रारंभिक जीवन',
+      },
+    });
+
+    // 1. Mock CSRF token response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: {
+          tokens: {
+            csrftoken: 'valid-csrf-token+\\',
+          },
+        },
+      }),
+    });
+
+    // 2. Mock Edit response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        edit: {
+          result: 'Success',
+          pageid: 12345,
+          title: 'Draft:Albert_Einstein',
+          newrevid: 100001,
+        },
+      }),
+    });
+
+    await invokeRouter(req, res);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // Inspect the POST parameters sent to MediaWiki edit endpoint
+    const editCall = mockFetch.mock.calls[1];
+    const bodyParams = editCall[1].body;
+    expect(bodyParams.get('section')).toBe('new');
+    expect(bodyParams.get('sectiontitle')).toBe('प्रारंभिक जीवन');
+    expect(bodyParams.get('summary')).toContain('/* प्रारंभिक जीवन */');
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
 });

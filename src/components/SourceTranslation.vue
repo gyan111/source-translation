@@ -136,47 +136,169 @@
           </div>
         </div>
 
-        <!-- Article exists warning -->
-        <div v-if="articleExistsWarning" class="mt-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300 animate-fade-in">
-          <span class="material-icons-round text-amber-500 text-base flex-shrink-0 mt-0.5">warning</span>
-          <div>
-            <span class="font-semibold">{{ $t('warnings.articleExistsTitle') }}</span>
-            {{ $t('warnings.articleExistsBody') }}
-            <a :href="articleExistsUrl" target="_blank" class="underline font-medium ml-1">{{ $t('warnings.articleExistsLink') }}</a>
+        <!-- Article exists warning with Section Expand suggestion -->
+        <div v-if="articleExistsWarning" class="mt-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-300 animate-fade-in">
+          <div class="flex items-start gap-2">
+            <span class="material-icons-round text-amber-500 text-base flex-shrink-0 mt-0.5">info</span>
+            <div>
+              <span class="font-bold">{{ $t('warnings.articleExistsTitle') }}</span>
+              {{ $t('warnings.articleExistsBody') }}
+              <a :href="articleExistsUrl" target="_blank" class="underline font-medium ml-1">{{ $t('warnings.articleExistsLink') }}</a>
+              <div class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                💡 <strong>Recommended:</strong> Use <em>Translate by Section</em> to expand this article without overwriting existing content.
+              </div>
+            </div>
           </div>
+          <button
+            v-if="articleViewMode !== 'section' && paragraphs.length"
+            type="button"
+            @click="articleViewMode = 'section'"
+            class="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500 text-white font-semibold text-xs shadow-sm hover:bg-amber-600 transition-colors flex items-center gap-1.5 cursor-pointer self-end sm:self-auto"
+          >
+            <span class="material-icons-round text-sm">view_agenda</span>
+            <span>Switch to Section Mode</span>
+          </button>
         </div>
       </div>
 
-      <!-- Action Bar (When paragraphs are loaded) -->
-      <div v-if="currentMode === 'article' && paragraphs.length" class="flex flex-wrap items-center justify-between gap-2.5 pt-3.5 mt-3.5 border-t border-slate-200/70 dark:border-white/[0.06]">
-        <div class="flex items-center gap-2">
-          <button v-if="!isTranslatingAll" @click="translateAllPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
-            <span class="material-icons-round text-sm">auto_fix_high</span>
-            <span>{{ $t('toolbar.translateAllPending') }}</span>
-          </button>
-          <button v-else @click="cancelTranslateAll" class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer">
-            <span class="material-icons-round text-sm">stop_circle</span>
-            <span>Cancel Translation</span>
-          </button>
+      <!-- Action Bar & Mode Switcher (When paragraphs are loaded) -->
+      <div v-if="currentMode === 'article' && paragraphs.length" class="space-y-3 pt-3.5 mt-3.5 border-t border-slate-200/70 dark:border-white/[0.06]">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <!-- Two Distinct Mode Toggle Buttons -->
+          <div class="flex items-center gap-1 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08] shadow-inner">
+            <button
+              type="button"
+              @click="articleViewMode = 'all'"
+              :class="[
+                'px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer select-none',
+                articleViewMode === 'all'
+                  ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-zinc-400'
+              ]"
+            >
+              <span class="material-icons-round text-sm">article</span>
+              <span>Translate Whole Article</span>
+            </button>
+            <button
+              type="button"
+              @click="articleViewMode = 'section'"
+              :class="[
+                'px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer select-none',
+                articleViewMode === 'section'
+                  ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-zinc-400'
+              ]"
+            >
+              <span class="material-icons-round text-sm">view_agenda</span>
+              <span>Translate by Section</span>
+              <span v-if="sectionsSummary.length" class="text-[10px] px-1.5 py-0.2 rounded-full bg-primary-500/10 text-primary-600 dark:text-primary-400 font-bold ml-0.5">
+                {{ sectionsSummary.length }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Translation Action Buttons -->
+          <div class="flex items-center gap-2">
+            <template v-if="articleViewMode === 'all'">
+              <button v-if="!isTranslatingAll" @click="translateAllPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
+                <span class="material-icons-round text-sm">auto_fix_high</span>
+                <span>{{ $t('toolbar.translateAllPending') }}</span>
+              </button>
+              <button v-else @click="cancelTranslateAll" class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer">
+                <span class="material-icons-round text-sm">stop_circle</span>
+                <span>Cancel Translation</span>
+              </button>
+            </template>
+            <template v-else>
+              <button v-if="!isTranslatingAll" @click="translateActiveSectionPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm" :disabled="!activeSectionPendingCount">
+                <span class="material-icons-round text-sm">auto_fix_high</span>
+                <span>Translate This Section ({{ activeSectionPendingCount }} pending)</span>
+              </button>
+              <button v-else @click="cancelTranslateAll" class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer">
+                <span class="material-icons-round text-sm">stop_circle</span>
+                <span>Cancel Translation</span>
+              </button>
+            </template>
+          </div>
+
+          <!-- Global Utilities -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button @click="previewAction" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
+              <span class="material-icons-round text-sm text-amber-500">visibility</span>
+              <span>{{ $t('toolbar.preview') }}</span>
+            </button>
+            <button @click="copyAll" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
+              <span class="material-icons-round text-sm text-slate-400">content_copy</span>
+              <span>{{ articleViewMode === 'section' ? 'Copy Section' : $t('toolbar.copyAll') }}</span>
+            </button>
+            <button @click="exportWikitext" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
+              <span class="material-icons-round text-sm text-slate-400">download</span>
+              <span>{{ articleViewMode === 'section' ? 'Export Section' : $t('toolbar.exportWikitext') }}</span>
+            </button>
+            <button @click="confirmReset" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40">
+              <span class="material-icons-round text-sm">restart_alt</span>
+              <span>{{ $t('toolbar.reset') }}</span>
+            </button>
+          </div>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap">
-          <button @click="previewAction" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
-            <span class="material-icons-round text-sm text-amber-500">visibility</span>
-            <span>{{ $t('toolbar.preview') }}</span>
-          </button>
-          <button @click="copyAll" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
-            <span class="material-icons-round text-sm text-slate-400">content_copy</span>
-            <span>{{ $t('toolbar.copyAll') }}</span>
-          </button>
-          <button @click="exportWikitext" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
-            <span class="material-icons-round text-sm text-slate-400">download</span>
-            <span>{{ $t('toolbar.exportWikitext') }}</span>
-          </button>
-          <button @click="confirmReset" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40">
-            <span class="material-icons-round text-sm">restart_alt</span>
-            <span>{{ $t('toolbar.reset') }}</span>
-          </button>
+        <!-- Horizontal Section Navigator (Scrollable Pills Bar) -->
+        <div v-if="sectionsSummary.length" class="pt-2 border-t border-slate-200/50 dark:border-white/[0.04]">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-300">
+              <span class="material-icons-round text-sm text-primary-500">menu_book</span>
+              <span>Article Sections ({{ sectionsSummary.length }})</span>
+              <span v-if="articleViewMode === 'section' && currentActiveSection" class="text-primary-600 dark:text-primary-400 font-semibold truncate max-w-[260px]">
+                — Section: {{ currentActiveSection.title }}
+              </span>
+            </div>
+            <div v-if="articleViewMode === 'section'" class="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                @click="goToPrevSection"
+                :disabled="activeSectionIndex === 0"
+                class="p-1 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center"
+                title="Previous section"
+              >
+                <span class="material-icons-round text-base">chevron_left</span>
+              </button>
+              <button
+                type="button"
+                @click="goToNextSection"
+                :disabled="activeSectionIndex === sectionsSummary.length - 1"
+                class="p-1 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center"
+                title="Next section"
+              >
+                <span class="material-icons-round text-base">chevron_right</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Horizontal Scrollable Pills -->
+          <div class="flex items-center gap-2 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+            <button
+              v-for="sec in sectionsSummary"
+              :key="sec.index"
+              type="button"
+              @click="activeSectionIndex = sec.index; articleViewMode = 'section'"
+              :class="[
+                'shrink-0 px-3 py-2 rounded-2xl text-xs font-medium border flex items-center gap-2 transition-all cursor-pointer select-none',
+                articleViewMode === 'section' && activeSectionIndex === sec.index
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/25 ring-2 ring-primary-400/30'
+                  : 'bg-white dark:bg-zinc-900 border-slate-200/80 dark:border-white/[0.08] hover:border-primary-300 dark:hover:border-primary-700 text-slate-700 dark:text-zinc-300 shadow-2xs'
+              ]"
+            >
+              <span class="font-bold opacity-80 text-[11px]">§{{ sec.index }}</span>
+              <span class="truncate max-w-[150px] font-semibold">{{ sec.title }}</span>
+              <span
+                class="text-[10px] px-1.5 py-0.2 rounded-full font-bold"
+                :class="articleViewMode === 'section' && activeSectionIndex === sec.index ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'"
+              >
+                {{ sec.translatedCount }}/{{ sec.paragraphCount }}
+              </span>
+              <span class="w-2 h-2 rounded-full shrink-0" :class="sec.statusClass"></span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -719,9 +841,9 @@
       <div v-if="paragraphs.length">
         <div class="space-y-3 mb-6">
           <ParagraphSection
-            v-for="(para, idx) in paragraphs"
-            :key="idx"
-            :index="idx"
+            v-for="para in visibleParagraphs"
+            :key="paragraphs.indexOf(para)"
+            :index="paragraphs.indexOf(para)"
             :source="para.source"
             :translation="para.translation"
             :originalTranslation="para.rawTranslation || para.translation"
@@ -731,20 +853,30 @@
             :isTargetRtl="isTargetRtl"
             :sourceLang="fromLanguage"
             :targetLang="toLanguage"
+            :sectionTitle="para.sectionTitle"
+            :sectionIndex="para.sectionIndex"
+            :isHeading="para.isHeading"
             @translate-paragraph="translateParagraph"
             @update-translation="updateTranslation"
             @toggle-reviewed="toggleReviewed"
           />
         </div>
 
-        <!-- Publish Section -->
+        <!-- Publish Section Card -->
         <div v-if="hasAnyTranslation" class="card-elevated p-5 sm:p-6 mb-12 border-t-4 border-primary-500 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mb-1">
               <span class="material-icons-round text-primary-500">publish</span>
-              Ready to Publish to Wikipedia?
+              <span>{{ articleViewMode === 'section' ? `Ready to Publish Section: "${currentActiveSection?.title || ''}"?` : 'Ready to Publish to Wikipedia?' }}</span>
             </h3>
-            <p class="text-xs text-slate-500 dark:text-zinc-400">Publish your translated article directly to {{ targetLanguageName }} Wikipedia (Mainspace, User Sandbox, or Draft).</p>
+            <p class="text-xs text-slate-500 dark:text-zinc-400">
+              <span v-if="articleViewMode === 'section'">
+                Publish this translated section directly to {{ targetLanguageName }} Wikipedia without overwriting other sections.
+              </span>
+              <span v-else>
+                Publish your translated article directly to {{ targetLanguageName }} Wikipedia (Mainspace, User Sandbox, or Draft).
+              </span>
+            </p>
           </div>
           <div>
             <button
@@ -753,7 +885,7 @@
               class="btn-primary text-xs py-3 px-6 flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap"
             >
               <span class="material-icons-round text-base">publish</span>
-              <span class="font-bold">Publish to Wikipedia</span>
+              <span class="font-bold">{{ articleViewMode === 'section' ? 'Publish Section' : 'Publish to Wikipedia' }}</span>
             </button>
             <a
               v-else
@@ -1085,17 +1217,20 @@
     <PublishModal
       :showModal="showPublishModal"
       :user="user"
-      :defaultTitle="publishTitle || articleInput"
+      :defaultTitle="publishTitle || (articleExistsTitle || articleInput)"
       :toLanguage="toLanguage"
       :fromLanguage="fromLanguage"
       :sourceTitle="articleInput"
       :targetLanguageName="targetLanguageName"
-      :fullTranslatedText="fullTranslatedText"
-      :reviewedCount="reviewedCount"
-      :totalSectionsCount="paragraphs.length"
-      :isFullyReviewed="isFullyReviewed"
+      :fullTranslatedText="articleViewMode === 'section' ? activeSectionTranslatedText : fullTranslatedText"
+      :reviewedCount="articleViewMode === 'section' ? (currentActiveSection?.reviewedCount || 0) : reviewedCount"
+      :totalSectionsCount="articleViewMode === 'section' ? (currentActiveSection?.paragraphCount || 1) : paragraphs.length"
+      :isFullyReviewed="articleViewMode === 'section' ? (currentActiveSection && currentActiveSection.reviewedCount === currentActiveSection.paragraphCount) : isFullyReviewed"
       :modificationPercent="totalModificationPercent"
       :mtEngine="translationService"
+      :publishMode="articleViewMode === 'section' ? 'section' : 'full'"
+      :sectionTitle="articleViewMode === 'section' ? (currentActiveSection?.title || '') : ''"
+      :targetArticleSections="targetArticleSections"
       @close="showPublishModal = false"
       @published="handleArticlePublished"
       @session-expired="$emit('session-expired')"
@@ -1112,7 +1247,12 @@ import axios from 'axios';
 import debounce from 'lodash/debounce';
 import { isRtlLanguage } from '../i18n.js';
 import { calculateModificationPercent } from '../utils/diffHelper.js';
-import { splitWikitextIntoParagraphs } from '../utils/wikitextSplitter.js';
+import {
+  splitWikitextIntoParagraphs,
+  splitWikitextWithSections,
+  extractSectionsFromWikitext,
+  resolveOrphanReferences,
+} from '../utils/wikitextSplitter.js';
 import { initIme } from '../utils/wikimediaIme.js';
 
 export default {
@@ -1144,6 +1284,14 @@ export default {
       rawWikitext: '',
       articleExistsWarning: false,
       articleExistsUrl: '',
+      articleExistsTitle: '',
+
+      // Section Translation State
+      articleViewMode: 'all', // 'all' (Translate Whole Article) | 'section' (Translate by Section)
+      activeSectionIndex: 0,
+      sectionsList: [],
+      targetArticleSections: [],
+      fetchingTargetSections: false,
 
       // Wikitext explicit mode state
       showWikitextBox: false,
@@ -1577,6 +1725,54 @@ export default {
       if (this.publishDestination === 'draft') return 'Enter draft title, e.g. Albert Einstein';
       return 'Enter live article title on target wiki';
     },
+    sectionsSummary() {
+      if (!this.sectionsList || !this.sectionsList.length) return [];
+      return this.sectionsList.map(sec => {
+        const paras = this.paragraphs.filter(p => p.sectionIndex === sec.index);
+        const translated = paras.filter(p => p.translation && p.status === 'translated').length;
+        const reviewed = paras.filter(p => p.reviewed).length;
+        const isDone = paras.length > 0 && translated === paras.length;
+        const isStarted = translated > 0;
+        let statusClass = 'bg-slate-300 dark:bg-zinc-600';
+        if (isDone && reviewed === paras.length) {
+          statusClass = 'bg-blue-500';
+        } else if (isDone) {
+          statusClass = 'bg-emerald-500';
+        } else if (isStarted) {
+          statusClass = 'bg-amber-500 animate-pulse';
+        }
+        return {
+          ...sec,
+          paragraphCount: paras.length,
+          translatedCount: translated,
+          reviewedCount: reviewed,
+          statusClass,
+        };
+      });
+    },
+    currentActiveSection() {
+      if (!this.sectionsSummary.length) return null;
+      return this.sectionsSummary.find(s => s.index === this.activeSectionIndex) || this.sectionsSummary[0];
+    },
+    visibleParagraphs() {
+      if (this.articleViewMode === 'all') {
+        return this.paragraphs;
+      }
+      return this.paragraphs.filter(p => p.sectionIndex === this.activeSectionIndex);
+    },
+    activeSectionParagraphs() {
+      return this.paragraphs.filter(p => p.sectionIndex === this.activeSectionIndex);
+    },
+    activeSectionTranslatedText() {
+      const text = this.activeSectionParagraphs.map(p => p.translation || p.source).join('\n\n');
+      return resolveOrphanReferences(text, this.rawWikitext);
+    },
+    hasAnyTranslationInActiveSection() {
+      return this.activeSectionParagraphs.some(p => Boolean(p.translation && p.translation.trim()));
+    },
+    activeSectionPendingCount() {
+      return this.activeSectionParagraphs.filter(p => !p.translation || p.status === 'pending').length;
+    },
     fullTranslatedText() {
       return this.paragraphs.map(p => p.translation || '').filter(Boolean).join('\n\n');
     },
@@ -1587,6 +1783,9 @@ export default {
       if (this.currentMode === 'template') {
         return Boolean(this.templateTranslated && this.templateTranslated.trim());
       }
+      if (this.articleViewMode === 'section') {
+        return this.hasAnyTranslationInActiveSection;
+      }
       return this.paragraphs.some(p => p.translation);
     },
     previewModalSourceWikitext() {
@@ -1596,6 +1795,9 @@ export default {
       if (this.currentMode === 'template') {
         return this.templateInput || '';
       }
+      if (this.articleViewMode === 'section') {
+        return this.activeSectionParagraphs.map(p => p.source).join('\n\n');
+      }
       return this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
     },
     previewModalTranslatedWikitext() {
@@ -1604,6 +1806,9 @@ export default {
       }
       if (this.currentMode === 'template') {
         return this.templateTranslated || '';
+      }
+      if (this.articleViewMode === 'section') {
+        return this.activeSectionTranslatedText;
       }
       return this.fullTranslatedText;
     },
@@ -1727,6 +1932,8 @@ reviewedCount() {
     showTemplateBox() { this.saveState(); },
     templateInput() { this.saveState(); },
     templateTranslated() { this.saveState(); },
+    articleViewMode() { this.saveState(); },
+    activeSectionIndex() { this.saveState(); },
   },
 
   methods: {
@@ -1912,6 +2119,92 @@ reviewedCount() {
       this.showToast('Translation cancelled.', 'warning');
     },
 
+    async translateActiveSectionPending() {
+      if (this.isTranslatingAll) return;
+      if (!this.toLanguage) {
+        this.toLanguageError = true;
+        this.showToast(this.$t('warnings.selectTarget'), 'warning');
+        return;
+      }
+      if (!this.validateServiceConfiguration()) {
+        return;
+      }
+
+      const pendingIndices = this.paragraphs
+        .map((p, idx) => ({ p, idx }))
+        .filter(({ p }) => p.sectionIndex === this.activeSectionIndex && (p.status === 'pending' || !p.translation))
+        .map(({ idx }) => idx);
+
+      if (!pendingIndices.length) {
+        this.showToast('All items in this section are already translated!', 'success');
+        return;
+      }
+
+      this.isTranslatingAll = true;
+      this.translatingCancelRequested = false;
+      this.translatingTotalCount = pendingIndices.length;
+      this.translatingDoneCount = 0;
+      this.translatingElapsedSeconds = 0;
+      this.translatingStartTime = Date.now();
+
+      if (this.translatingTimer) clearInterval(this.translatingTimer);
+      this.translatingTimer = setInterval(() => {
+        if (this.translatingStartTime) {
+          this.translatingElapsedSeconds = Math.floor((Date.now() - this.translatingStartTime) / 1000);
+        }
+      }, 1000);
+
+      const sectionTitle = this.currentActiveSection?.title || 'Active section';
+      this.showToast(`Translating ${pendingIndices.length} item(s) in "${sectionTitle}"...`, 'warning');
+
+      for (let i = 0; i < pendingIndices.length; i++) {
+        if (this.translatingCancelRequested) {
+          this.showToast('Section translation paused.', 'warning');
+          break;
+        }
+        const idx = pendingIndices[i];
+        this.translatingCurrentIndex = i + 1;
+        const sourceText = (this.paragraphs[idx].source || '').trim();
+        const snippet = sourceText.replace(/^[=\s]+|[=\s]+$/g, '').slice(0, 45);
+        this.translatingStageText = snippet ? `Translating: "${snippet}..."` : 'Translating section...';
+
+        if (this.autoScrollEnabled) {
+          this.$nextTick(() => {
+            const el = document.getElementById(`paragraph-section-${idx}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          });
+        }
+
+        await this.translateParagraph(idx);
+        this.translatingDoneCount = i + 1;
+      }
+
+      if (this.translatingTimer) clearInterval(this.translatingTimer);
+      this.isTranslatingAll = false;
+      if (!this.translatingCancelRequested) {
+        this.showToast(`"${sectionTitle}" translated!`, 'success');
+        this.trackAnalyticsEvent('translate');
+      }
+    },
+
+    goToPrevSection() {
+      if (!this.sectionsSummary.length) return;
+      const currentIndexInSummary = this.sectionsSummary.findIndex(s => s.index === this.activeSectionIndex);
+      if (currentIndexInSummary > 0) {
+        this.activeSectionIndex = this.sectionsSummary[currentIndexInSummary - 1].index;
+      }
+    },
+
+    goToNextSection() {
+      if (!this.sectionsSummary.length) return;
+      const currentIndexInSummary = this.sectionsSummary.findIndex(s => s.index === this.activeSectionIndex);
+      if (currentIndexInSummary >= 0 && currentIndexInSummary < this.sectionsSummary.length - 1) {
+        this.activeSectionIndex = this.sectionsSummary[currentIndexInSummary + 1].index;
+      }
+    },
+
     deleteCurrentApiKey() {
       const currentService = this.translationService;
       const serviceName = this.availableServices.find(s => s.id === currentService)?.name || currentService;
@@ -1959,6 +2252,8 @@ reviewedCount() {
         missingLinkStrategy: this.missingLinkStrategy,
         paragraphs: this.paragraphs,
         rawWikitext: this.rawWikitext,
+        articleViewMode: this.articleViewMode,
+        activeSectionIndex: this.activeSectionIndex,
         showWikitextBox: this.showWikitextBox,
         showTemplateBox: this.showTemplateBox,
         wikitextInput: this.wikitextInput,
@@ -1993,6 +2288,8 @@ reviewedCount() {
           if (parsed.missingLinkStrategy) this.missingLinkStrategy = parsed.missingLinkStrategy;
           if (parsed.paragraphs) this.paragraphs = parsed.paragraphs;
           if (parsed.rawWikitext) this.rawWikitext = parsed.rawWikitext;
+          if (parsed.articleViewMode) this.articleViewMode = parsed.articleViewMode;
+          if (typeof parsed.activeSectionIndex === 'number') this.activeSectionIndex = parsed.activeSectionIndex;
           if (parsed.showWikitextBox) this.showWikitextBox = parsed.showWikitextBox;
           if (parsed.showTemplateBox) this.showTemplateBox = parsed.showTemplateBox;
           if (parsed.wikitextInput) this.wikitextInput = parsed.wikitextInput;
@@ -2000,6 +2297,10 @@ reviewedCount() {
           if (parsed.templateInput) this.templateInput = parsed.templateInput;
           if (parsed.templateTranslated) this.templateTranslated = parsed.templateTranslated;
           if (parsed.publishDestination) this.publishDestination = parsed.publishDestination;
+
+          if (this.rawWikitext && (!this.sectionsList || !this.sectionsList.length)) {
+            this.sectionsList = extractSectionsFromWikitext(this.rawWikitext);
+          }
         }
       } catch (e) {
         console.error('Could not load saved state', e);
@@ -2014,6 +2315,10 @@ reviewedCount() {
       this.showResetConfirm = false;
       this.clearArticle();
       this.currentMode = 'article';
+      this.articleViewMode = 'all';
+      this.activeSectionIndex = 0;
+      this.sectionsList = [];
+      this.targetArticleSections = [];
       this.translationService = 'mint';
       this.serviceKeys = {};
       this.serviceEndpoint = '';
@@ -2099,6 +2404,11 @@ reviewedCount() {
       this.paragraphs = [];
       this.rawWikitext = '';
       this.articleExistsWarning = false;
+      this.articleExistsUrl = '';
+      this.articleExistsTitle = '';
+      this.sectionsList = [];
+      this.targetArticleSections = [];
+      this.activeSectionIndex = 0;
     },
 
     async getArticleAction() {
@@ -2133,19 +2443,28 @@ reviewedCount() {
     },
 
     splitIntoParagraphs(wikitext) {
-      const parts = splitWikitextIntoParagraphs(wikitext);
-      this.paragraphs = parts.map(source => ({
-        source: source.trim(),
+      const partsWithSections = splitWikitextWithSections(wikitext);
+      this.sectionsList = extractSectionsFromWikitext(wikitext);
+      this.activeSectionIndex = 0;
+      this.paragraphs = partsWithSections.map(p => ({
+        source: p.source.trim(),
         translation: '',
         rawTranslation: '',
         status: 'pending',
         reviewed: false,
+        sectionIndex: p.sectionIndex,
+        sectionTitle: p.sectionTitle,
+        sectionLevel: p.sectionLevel,
+        isHeading: p.isHeading,
       }));
     },
 
     async checkArticleExists() {
       if (!this.articleInput || !this.toLanguage) return;
       this.articleExistsWarning = false;
+      this.articleExistsUrl = '';
+      this.articleExistsTitle = '';
+      this.targetArticleSections = [];
       try {
         const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&titles=${encodeURIComponent(this.articleInput)}&sites=${this.fromLanguage}wiki&props=sitelinks&format=json&origin=*`;
         const res = await fetch(url);
@@ -2157,11 +2476,38 @@ reviewedCount() {
           const targetSitelink = sitelinks[`${this.toLanguage}wiki`];
           if (targetSitelink) {
             this.articleExistsWarning = true;
+            this.articleExistsTitle = targetSitelink.title;
             this.articleExistsUrl = `https://${this.toLanguage}.wikipedia.org/wiki/${encodeURIComponent(targetSitelink.title)}`;
+            await this.fetchTargetArticleSections(targetSitelink.title);
           }
         }
       } catch {
         // silently fail - it's just a warning
+      }
+    },
+
+    async fetchTargetArticleSections(title) {
+      if (!title || !this.toLanguage) return;
+      this.fetchingTargetSections = true;
+      try {
+        const url = `https://${this.toLanguage}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&origin=*`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.parse?.sections) {
+          this.targetArticleSections = data.parse.sections.map(s => ({
+            index: String(s.index),
+            line: s.line,
+            title: s.line,
+            level: s.level,
+          }));
+        } else {
+          this.targetArticleSections = [];
+        }
+      } catch (e) {
+        console.warn('Failed to fetch target article sections', e);
+        this.targetArticleSections = [];
+      } finally {
+        this.fetchingTargetSections = false;
       }
     },
 
@@ -2337,6 +2683,9 @@ reviewedCount() {
       } else if (this.currentMode === 'template') {
         textToPreview = this.templateTranslated;
         sourceText = this.templateInput;
+      } else if (this.articleViewMode === 'section') {
+        textToPreview = this.activeSectionTranslatedText;
+        sourceText = this.activeSectionParagraphs.map(p => p.source).join('\n\n');
       } else {
         textToPreview = this.fullTranslatedText;
         sourceText = this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
@@ -2531,10 +2880,15 @@ reviewedCount() {
         this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
         return;
       }
-      navigator.clipboard.writeText(this.fullTranslatedText)
+      const textToCopy = this.articleViewMode === 'section' ? this.activeSectionTranslatedText : this.fullTranslatedText;
+      const isReviewed = this.articleViewMode === 'section'
+        ? (this.currentActiveSection && this.currentActiveSection.reviewedCount === this.currentActiveSection.paragraphCount)
+        : this.isFullyReviewed;
+
+      navigator.clipboard.writeText(textToCopy)
         .then(() => {
-          this.trackAnalyticsEvent('copy', { format: 'full_wikitext' });
-          if (!this.isFullyReviewed) {
+          this.trackAnalyticsEvent('copy', { format: this.articleViewMode === 'section' ? 'section_wikitext' : 'full_wikitext' });
+          if (!isReviewed) {
             this.showToast('Copied to clipboard! ⚠️ Please proofread unreviewed machine translation before publishing on Wikipedia.', 'warning');
           } else {
             this.showToast(this.$t('warnings.copied'), 'success');
@@ -2580,15 +2934,23 @@ reviewedCount() {
         this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
         return;
       }
-      this.trackAnalyticsEvent('export', { format: 'wiki_file' });
-      const blob = new Blob([this.fullTranslatedText], { type: 'text/plain' });
+      const textToExport = this.articleViewMode === 'section' ? this.activeSectionTranslatedText : this.fullTranslatedText;
+      const isReviewed = this.articleViewMode === 'section'
+        ? (this.currentActiveSection && this.currentActiveSection.reviewedCount === this.currentActiveSection.paragraphCount)
+        : this.isFullyReviewed;
+
+      this.trackAnalyticsEvent('export', { format: this.articleViewMode === 'section' ? 'section_wiki_file' : 'wiki_file' });
+      const blob = new Blob([textToExport], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${this.articleInput || 'translated'}_${this.toLanguage}.wiki`;
+      const sectionPart = this.articleViewMode === 'section' && this.currentActiveSection?.title 
+        ? `_${this.currentActiveSection.title.replace(/\s+/g, '_')}`
+        : '';
+      a.download = `${this.articleInput || 'translated'}${sectionPart}_${this.toLanguage}.wiki`;
       a.click();
       URL.revokeObjectURL(url);
-      if (!this.isFullyReviewed) {
+      if (!isReviewed) {
         this.showToast('Wikitext exported! ⚠️ Please proofread unreviewed text before publishing to Wikipedia.', 'warning');
       } else {
         this.showToast(this.$t('warnings.exported'), 'success');

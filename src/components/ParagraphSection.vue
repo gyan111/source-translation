@@ -24,6 +24,22 @@
         <span class="text-xs font-bold text-slate-500 dark:text-zinc-400 font-mono bg-slate-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-white/[0.06]">
           §{{ index + 1 }}
         </span>
+
+        <span
+          v-if="sectionTitle"
+          class="text-[11px] font-semibold text-slate-600 dark:text-zinc-300 bg-slate-100/90 dark:bg-zinc-800/70 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-white/[0.04] truncate max-w-[130px] sm:max-w-[190px]"
+          :title="`Section: ${sectionTitle}`"
+        >
+          {{ sectionTitle }}
+        </span>
+
+        <span
+          v-if="isHeading"
+          class="inline-flex items-center gap-0.5 px-2 py-0.2 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/60"
+        >
+          <span class="material-icons-round text-[11px]">title</span>
+          Heading
+        </span>
         
         <!-- Status Badges -->
         <span v-if="status === 'translated' && reviewed" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold border border-emerald-300 dark:border-emerald-800/60 shadow-2xs">
@@ -488,6 +504,18 @@ export default {
     sourceLang: {
       type: String,
       default: 'en',
+    },
+    sectionTitle: {
+      type: String,
+      default: '',
+    },
+    sectionIndex: {
+      type: Number,
+      default: 0,
+    },
+    isHeading: {
+      type: Boolean,
+      default: false,
     },
   },
   data() {

@@ -12,11 +12,17 @@
           <div class="flex items-center justify-between pb-4 border-b border-slate-200/60 dark:border-white/[0.08] mb-5">
             <div class="flex items-center gap-2.5">
               <div class="w-9 h-9 rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center">
-                <span class="material-icons-round text-xl">publish</span>
+                <span class="material-icons-round text-xl">{{ publishMode === 'section' ? 'view_agenda' : 'publish' }}</span>
               </div>
               <div>
-                <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100">Publish to Wikipedia</h3>
-                <p class="text-xs text-slate-500 dark:text-zinc-400">Publish your translated article to {{ targetLanguageName }} ({{ toLanguage }}.wikipedia.org)</p>
+                <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100">
+                  {{ publishMode === 'section' ? 'Publish Section to Wikipedia' : 'Publish to Wikipedia' }}
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-zinc-400">
+                  <span v-if="publishMode === 'section' && sectionTitle">Publish section "{{ sectionTitle }}" to </span>
+                  <span v-else>Publish your translated article to </span>
+                  {{ targetLanguageName }} ({{ toLanguage }}.wikipedia.org)
+                </p>
               </div>
             </div>
             <button @click="close" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors">
@@ -63,6 +69,16 @@
 
             <!-- Summary Details Card -->
             <div class="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900/90 border border-slate-200 dark:border-white/[0.08] space-y-2.5">
+              <div v-if="publishMode === 'section' && sectionTitle" class="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-200/60 dark:border-white/[0.06]">
+                <span class="text-slate-400 font-medium">Section:</span>
+                <span class="font-bold text-primary-600 dark:text-primary-400">{{ sectionTitle }}</span>
+              </div>
+              <div v-if="publishMode === 'section'" class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400 font-medium">Placement:</span>
+                <span class="font-semibold text-slate-800 dark:text-zinc-200">
+                  {{ sectionPlacement === 'new' ? 'Append as new section at end' : `Replace section §${selectedReplaceSectionIndex}` }}
+                </span>
+              </div>
               <div class="flex items-center justify-between text-[11px]">
                 <span class="text-slate-400 font-medium">Destination:</span>
                 <span class="font-bold text-slate-800 dark:text-zinc-100 capitalize">{{ selectedDestLabel }}</span>
@@ -217,6 +233,34 @@
 
             <!-- Destination Selection Header -->
             <div class="pt-2">
+              <!-- Section Placement Options (when in Section Mode) -->
+              <div v-if="publishMode === 'section'" class="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200 dark:border-white/[0.08] mb-4 space-y-2.5">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-zinc-200">
+                  <span class="material-icons-round text-sm text-primary-500">format_indent_increase</span>
+                  <span>Section Placement on Target Page:</span>
+                </div>
+                <div class="space-y-2 text-xs">
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                    <input type="radio" value="new" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                    <span>Append as new section at bottom of article</span>
+                  </label>
+                  <label v-if="targetArticleSections && targetArticleSections.length" class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                    <input type="radio" value="replace" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                    <span>Replace an existing section:</span>
+                  </label>
+                  <select
+                    v-if="sectionPlacement === 'replace' && targetArticleSections && targetArticleSections.length"
+                    v-model="selectedReplaceSectionIndex"
+                    class="select-field text-xs w-full mt-1 bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
+                  >
+                    <option value="" disabled>Select section to replace...</option>
+                    <option v-for="sec in targetArticleSections" :key="sec.index" :value="sec.index">
+                      §{{ sec.index }}: {{ sec.line }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
               <label class="field-label mb-2 text-slate-600 dark:text-zinc-300 font-bold uppercase tracking-wider text-[11px]">
                 Choose Destination to Publish:
               </label>
@@ -394,6 +438,18 @@ export default {
       type: String,
       default: 'google',
     },
+    publishMode: {
+      type: String,
+      default: 'full', // 'full' or 'section'
+    },
+    sectionTitle: {
+      type: String,
+      default: '',
+    },
+    targetArticleSections: {
+      type: Array,
+      default: () => [],
+    },
   },
   data() {
     return {
@@ -409,6 +465,8 @@ export default {
       isSessionExpired: false,
       titleChecking: false,
       pageExists: null,
+      sectionPlacement: 'new',
+      selectedReplaceSectionIndex: '',
     };
   },
   computed: {
@@ -533,14 +591,25 @@ export default {
       this.errorMessage = '';
 
       try {
-        const response = await axios.post('/publish', {
+        const payload = {
           text: this.fullTranslatedText,
           language: this.toLanguage,
           title: finalTitle,
           sourceLanguage: this.fromLanguage,
           sourceTitle: this.sourceTitle,
           mtEngine: this.mtEngine || 'google',
-        });
+        };
+
+        if (this.publishMode === 'section') {
+          payload.section = this.sectionPlacement === 'replace' && this.selectedReplaceSectionIndex !== ''
+            ? this.selectedReplaceSectionIndex
+            : 'new';
+          if (this.sectionTitle) {
+            payload.sectiontitle = this.sectionTitle;
+          }
+        }
+
+        const response = await axios.post('/publish', payload);
 
         if (response.data && response.data.success) {
           this.publishSuccess = true;

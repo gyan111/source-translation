@@ -141,6 +141,82 @@ function classifyLink(content) {
 }
 
 /**
+ * Split parameters of a file link respecting nested brackets and braces.
+ */
+function splitFileParameters(text) {
+  const parts = [];
+  let current = '';
+  let bracketDepth = 0;
+  let braceDepth = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1] || '';
+
+    if (ch === '[' && next === '[') {
+      bracketDepth++;
+      current += '[[';
+      i++;
+    } else if (ch === ']' && next === ']') {
+      if (bracketDepth > 0) bracketDepth--;
+      current += ']]';
+      i++;
+    } else if (ch === '{' && next === '{') {
+      braceDepth++;
+      current += '{{';
+      i++;
+    } else if (ch === '}' && next === '}') {
+      if (braceDepth > 0) braceDepth--;
+      current += '}}';
+      i++;
+    } else if (ch === '|' && bracketDepth === 0 && braceDepth === 0) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+/**
+ * Parses a MediaWiki file link into target, options, and translatable caption.
+ */
+export function parseFileLink(content) {
+  if (!content.startsWith('[[') || !content.endsWith(']]')) {
+    return { target: '', options: [], caption: null };
+  }
+  const inner = content.slice(2, -2);
+  const parts = splitFileParameters(inner);
+  if (parts.length === 0) return { target: '', options: [], caption: null };
+
+  const target = parts[0].trim();
+  const options = [];
+  let caption = null;
+
+  const KNOWN_OPTIONS = new Set([
+    'thumb', 'thumbnail', 'frame', 'framed', 'frameless',
+    'left', 'right', 'center', 'none',
+    'baseline', 'sub', 'super', 'top', 'text-top', 'middle', 'bottom', 'text-bottom'
+  ]);
+
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i].trim();
+    const lower = p.toLowerCase();
+    const isDimension = /^\d+px$/i.test(lower) || /^x\d+px$/i.test(lower) || /^\d+x\d+px$/i.test(lower) || /^upright(=[\d.]+)?$/i.test(lower);
+    const isNamedParam = /^(link|alt|page|class|lang)=/i.test(lower);
+    if (KNOWN_OPTIONS.has(lower) || isDimension || isNamedParam) {
+      options.push(p);
+    } else {
+      caption = p;
+    }
+  }
+
+  return { target, options, caption };
+}
+
+/**
  * Parse wikitext into an array of typed segments.
  * Protected segments (templates, links, refs, tags) are extracted.
  * The remaining text segments are what need translation.
@@ -194,8 +270,12 @@ export function parseWikitext(wikitext) {
           target, display,
         });
       } else if (linkType === 'file') {
+        const parsedFile = parseFileLink(el.content);
         protectedItems.push({
           placeholder, type: 'FILE', original: el.content, index: placeholderIndex,
+          target: parsedFile.target,
+          options: parsedFile.options,
+          caption: parsedFile.caption,
         });
       } else {
         protectedItems.push({
@@ -239,6 +319,8 @@ export function parseWikitext(wikitext) {
           placeholder: item.placeholder,
           ...(item.target !== undefined ? { target: restoreProtected(item.target) } : {}),
           ...(item.display !== undefined ? { display: restoreProtected(item.display) } : {}),
+          ...(item.options !== undefined ? { options: item.options } : {}),
+          ...(item.caption !== undefined ? { caption: restoreProtected(item.caption) } : {}),
         });
       }
     } else {
@@ -795,7 +877,21 @@ export function reassembleWikitext(
         break;
       }
 
-      // All other types (file, comment, tag, ref, extlink, magic) are preserved as-is
+      case 'file': {
+        if (seg.caption) {
+          const translatedCaption = translatedTexts[seg.caption] ?? seg.caption;
+          const allOptions = [...(seg.options || [])];
+          if (translatedCaption && translatedCaption.trim()) {
+            allOptions.push(translatedCaption.trim());
+          }
+          parts.push(`[[${seg.target}${allOptions.length ? '|' + allOptions.join('|') : ''}]]`);
+        } else {
+          parts.push(seg.content);
+        }
+        break;
+      }
+
+      // All other types (comment, tag, ref, extlink, magic) are preserved as-is
       default:
         parts.push(seg.content);
         break;
@@ -955,4 +1051,62 @@ export function reassembleTemplate(
     const sep = hasSpaceBeforeFirstPipe ? ' | ' : '| ';
     return `{{${name}${headerPrefix}${sep}${paramParts.join(' | ')}}}`;
   }
+}
+
+/**
+ * Resolves orphan references in an isolated section wikitext.
+ * If a section contains a self-closing reference <ref name="xyz" /> or <ref name="xyz"></ref>
+ * whose definition <ref name="xyz">...</ref> is not inside the section,
+ * but exists in fullArticleWikitext, this inlines the full definition into the first
+ * occurrence within the section so MediaWiki does not throw a Cite error.
+ *
+ * @param {string} sectionWikitext - Wikitext of the isolated section
+ * @param {string} fullArticleWikitext - Wikitext of the entire source article
+ * @returns {string} Section wikitext with orphan references resolved
+ */
+export function resolveOrphanReferences(sectionWikitext, fullArticleWikitext) {
+  if (!sectionWikitext || typeof sectionWikitext !== 'string') return sectionWikitext || '';
+  if (!fullArticleWikitext || typeof fullArticleWikitext !== 'string') return sectionWikitext;
+
+  // 1. Find all full reference definitions in fullArticleWikitext: <ref name="..." ...>content</ref>
+  const fullRefRegex = /<ref(?:\s+[^>]*)?\s+name=(?:"([^"]+)"|'([^']+)'|([^\s\/>]+))([^>]*)>([\s\S]*?)<\/ref>/gi;
+  const definitions = new Map();
+  let match;
+  while ((match = fullRefRegex.exec(fullArticleWikitext)) !== null) {
+    const name = match[1] || match[2] || match[3];
+    const content = match[5] || '';
+    if (content.trim()) {
+      definitions.set(name, {
+        fullTag: match[0],
+        name,
+        content,
+      });
+    }
+  }
+
+  // 2. Find all full definitions already inside sectionWikitext so we don't duplicate
+  const localDefinitions = new Set();
+  const localRefRegex = /<ref(?:\s+[^>]*)?\s+name=(?:"([^"]+)"|'([^']+)'|([^\s\/>]+))([^>]*)>([\s\S]*?)<\/ref>/gi;
+  while ((match = localRefRegex.exec(sectionWikitext)) !== null) {
+    const name = match[1] || match[2] || match[3];
+    if (match[5] && match[5].trim()) {
+      localDefinitions.add(name);
+    }
+  }
+
+  // 3. Find self-closing or empty refs in sectionWikitext: <ref name="..." /> or <ref name="..."></ref>
+  // and replace the FIRST occurrence with the full definition if missing locally but present in definitions
+  const resolvedNames = new Set();
+  const orphanRefRegex = /<ref(?:\s+[^>]*)?\s+name=(?:"([^"]+)"|'([^']+)'|([^\s\/>]+))([^>]*)(?:\/>|>\s*<\/ref>)/gi;
+
+  const resolvedWikitext = sectionWikitext.replace(orphanRefRegex, (fullMatch, n1, n2, n3) => {
+    const name = n1 || n2 || n3;
+    if (!localDefinitions.has(name) && !resolvedNames.has(name) && definitions.has(name)) {
+      resolvedNames.add(name);
+      return definitions.get(name).fullTag;
+    }
+    return fullMatch;
+  });
+
+  return resolvedWikitext;
 }
