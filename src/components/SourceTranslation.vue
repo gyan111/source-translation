@@ -177,7 +177,7 @@
               ]"
             >
               <span class="material-icons-round text-sm">article</span>
-              <span>Translate Whole Article</span>
+              <span>{{ $t('toolbar.translateWholeArticle') }}</span>
             </button>
             <button
               type="button"
@@ -190,7 +190,7 @@
               ]"
             >
               <span class="material-icons-round text-sm">view_agenda</span>
-              <span>Translate by Section</span>
+              <span>{{ $t('toolbar.translateBySection') }}</span>
               <span v-if="sectionsSummary.length" class="text-[10px] px-1.5 py-0.2 rounded-full bg-primary-500/10 text-primary-600 dark:text-primary-400 font-bold ml-0.5">
                 {{ sectionsSummary.length }}
               </span>
@@ -212,7 +212,7 @@
             <template v-else>
               <button v-if="!isTranslatingAll" @click="translateActiveSectionPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm" :disabled="!activeSectionPendingCount">
                 <span class="material-icons-round text-sm">auto_fix_high</span>
-                <span>Translate This Section ({{ activeSectionPendingCount }} pending)</span>
+                <span>{{ $t('toolbar.translateActiveSection') }} ({{ activeSectionPendingCount }})</span>
               </button>
               <button v-else @click="cancelTranslateAll" class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer">
                 <span class="material-icons-round text-sm">stop_circle</span>
@@ -229,11 +229,11 @@
             </button>
             <button @click="copyAll" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
               <span class="material-icons-round text-sm text-slate-400">content_copy</span>
-              <span>{{ articleViewMode === 'section' ? 'Copy Section' : $t('toolbar.copyAll') }}</span>
+              <span>{{ articleViewMode === 'section' ? $t('toolbar.copySection') : $t('toolbar.copyAll') }}</span>
             </button>
             <button @click="exportWikitext" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
               <span class="material-icons-round text-sm text-slate-400">download</span>
-              <span>{{ articleViewMode === 'section' ? 'Export Section' : $t('toolbar.exportWikitext') }}</span>
+              <span>{{ articleViewMode === 'section' ? $t('toolbar.exportSection') : $t('toolbar.exportWikitext') }}</span>
             </button>
             <button @click="confirmReset" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40">
               <span class="material-icons-round text-sm">restart_alt</span>
@@ -258,7 +258,7 @@
                 @click="goToPrevSection"
                 :disabled="activeSectionIndex === 0"
                 class="p-1 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center"
-                title="Previous section"
+                :title="$t('section.prevSection')"
               >
                 <span class="material-icons-round text-base">chevron_left</span>
               </button>
@@ -267,7 +267,7 @@
                 @click="goToNextSection"
                 :disabled="activeSectionIndex === sectionsSummary.length - 1"
                 class="p-1 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center"
-                title="Next section"
+                :title="$t('section.nextSection')"
               >
                 <span class="material-icons-round text-base">chevron_right</span>
               </button>
@@ -867,14 +867,14 @@
           <div>
             <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mb-1">
               <span class="material-icons-round text-primary-500">publish</span>
-              <span>{{ articleViewMode === 'section' ? `Ready to Publish Section: "${currentActiveSection?.title || ''}"?` : 'Ready to Publish to Wikipedia?' }}</span>
+              <span>{{ articleViewMode === 'section' ? $t('section.readyToPublish', { title: currentActiveSection?.title || '' }) : $t('section.readyToPublishArticle') }}</span>
             </h3>
             <p class="text-xs text-slate-500 dark:text-zinc-400">
               <span v-if="articleViewMode === 'section'">
-                Publish this translated section directly to {{ targetLanguageName }} Wikipedia without overwriting other sections.
+                {{ $t('section.publishDescription', { lang: targetLanguageName }) }}
               </span>
               <span v-else>
-                Publish your translated article directly to {{ targetLanguageName }} Wikipedia (Mainspace, User Sandbox, or Draft).
+                {{ $t('section.publishArticleDescription', { lang: targetLanguageName }) }}
               </span>
             </p>
           </div>
@@ -885,7 +885,7 @@
               class="btn-primary text-xs py-3 px-6 flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap"
             >
               <span class="material-icons-round text-base">publish</span>
-              <span class="font-bold">{{ articleViewMode === 'section' ? 'Publish Section' : 'Publish to Wikipedia' }}</span>
+              <span class="font-bold">{{ articleViewMode === 'section' ? $t('toolbar.publishSection') : $t('toolbar.publish') }}</span>
             </button>
             <a
               v-else
@@ -2136,7 +2136,7 @@ reviewedCount() {
         .map(({ idx }) => idx);
 
       if (!pendingIndices.length) {
-        this.showToast('All items in this section are already translated!', 'success');
+        this.showToast(this.$t('section.allTranslated'), 'success');
         return;
       }
 
@@ -2155,11 +2155,11 @@ reviewedCount() {
       }, 1000);
 
       const sectionTitle = this.currentActiveSection?.title || 'Active section';
-      this.showToast(`Translating ${pendingIndices.length} item(s) in "${sectionTitle}"...`, 'warning');
+      this.showToast(this.$t('section.translatingItems', { count: pendingIndices.length, title: sectionTitle }), 'warning');
 
       for (let i = 0; i < pendingIndices.length; i++) {
         if (this.translatingCancelRequested) {
-          this.showToast('Section translation paused.', 'warning');
+          this.showToast(this.$t('section.paused'), 'warning');
           break;
         }
         const idx = pendingIndices[i];
@@ -2184,7 +2184,7 @@ reviewedCount() {
       if (this.translatingTimer) clearInterval(this.translatingTimer);
       this.isTranslatingAll = false;
       if (!this.translatingCancelRequested) {
-        this.showToast(`"${sectionTitle}" translated!`, 'success');
+        this.showToast(this.$t('section.sectionTranslated', { title: sectionTitle }), 'success');
         this.trackAnalyticsEvent('translate');
       }
     },

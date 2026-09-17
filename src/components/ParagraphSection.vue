@@ -38,7 +38,7 @@
           class="inline-flex items-center gap-0.5 px-2 py-0.2 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/60"
         >
           <span class="material-icons-round text-[11px]">title</span>
-          Heading
+          {{ $t('section.heading') }}
         </span>
         
         <!-- Status Badges -->

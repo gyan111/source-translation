@@ -15,7 +15,21 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const { text, language, title, sourceLanguage, sourceTitle, mtEngine, sessionId, section, sectiontitle } = req.body;
+  const {
+    text,
+    language,
+    title,
+    sourceLanguage,
+    sourceTitle,
+    mtEngine,
+    sessionId,
+    section,
+    sectiontitle,
+    publishMode,
+    placementMode,
+    targetSectionIndex,
+    targetSectionTitle,
+  } = req.body;
 
   if (!text || !language || !title) {
     return res.status(400).json({
@@ -80,12 +94,36 @@ router.post('/', async (req, res) => {
 
     // 2. Format edit summary with source attribution (CC BY-SA compliance)
     let editSummary = 'Created via Source Translation Tool (https://source-translation.toolforge.org)';
-    if (sourceTitle && sourceLanguage) {
-      if (sectiontitle) {
-        editSummary = `/* ${sectiontitle} */ Translated section from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`;
+    const attribution = (sourceTitle && sourceLanguage)
+      ? `Translated from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`
+      : 'Created via Source Translation Tool (https://source-translation.toolforge.org)';
+
+    const isSectionPublish = publishMode === 'section' || (section !== undefined && section !== null && section !== '') || Boolean(sectiontitle);
+    if (isSectionPublish) {
+      const displaySecTitle = sectiontitle || targetSectionTitle || '';
+      if (placementMode === 'insert_after') {
+        const anchorName = targetSectionTitle || (targetSectionIndex === '0' ? 'Lead section' : `§${targetSectionIndex}`);
+        editSummary = displaySecTitle
+          ? `/* ${displaySecTitle} */ Inserted section after "${anchorName}" from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`
+          : `Inserted section after "${anchorName}" via Source Translation Tool (https://source-translation.toolforge.org)`;
+      } else if (placementMode === 'insert_before') {
+        const anchorName = targetSectionTitle || `§${targetSectionIndex}`;
+        editSummary = displaySecTitle
+          ? `/* ${displaySecTitle} */ Inserted section before "${anchorName}" from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`
+          : `Inserted section before "${anchorName}" via Source Translation Tool (https://source-translation.toolforge.org)`;
+      } else if (placementMode === 'replace') {
+        const anchorName = targetSectionTitle || `§${targetSectionIndex}`;
+        editSummary = displaySecTitle
+          ? `/* ${displaySecTitle} */ Replaced section "${anchorName}" from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`
+          : `Replaced section "${anchorName}" via Source Translation Tool (https://source-translation.toolforge.org)`;
       } else {
-        editSummary = `Translated from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`;
+        // append_bottom or default section
+        editSummary = displaySecTitle
+          ? `/* ${displaySecTitle} */ Translated section from [[:${sourceLanguage}:${sourceTitle}]] via Source Translation Tool (https://source-translation.toolforge.org)`
+          : attribution;
       }
+    } else if (sourceTitle && sourceLanguage) {
+      editSummary = attribution;
     }
 
     // 3. Publish Edit with OAuth Bearer Token & User-Agent
@@ -93,17 +131,82 @@ router.post('/', async (req, res) => {
     const editPayload = {
       action: 'edit',
       title: title,
-      text: text,
       summary: editSummary,
       format: 'json',
       token: csrfToken,
       assert: 'user',
     };
 
-    if (section !== undefined && section !== null && section !== '') {
-      editPayload.section = String(section);
-      if (sectiontitle && String(section) === 'new') {
-        editPayload.sectiontitle = sectiontitle;
+    if (publishMode === 'section') {
+      if (placementMode === 'insert_after' || placementMode === 'insert_before') {
+        let anchorIndex = '0';
+        if (placementMode === 'insert_after') {
+          anchorIndex = targetSectionIndex !== undefined && targetSectionIndex !== null ? String(targetSectionIndex) : '0';
+        } else {
+          const k = parseInt(targetSectionIndex, 10);
+          anchorIndex = String(isNaN(k) || k <= 1 ? 0 : k - 1);
+        }
+
+        // Fetch anchor section wikitext
+        const parseUrl = `https://${language}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=wikitext&section=${anchorIndex}&format=json`;
+        const parseResponse = await fetch(parseUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'User-Agent': userAgent,
+          },
+        });
+        const parseData = await parseResponse.json();
+        if (parseData.error) {
+          throw new Error(`Failed to locate target section on "${title}": ${parseData.error.info || 'Section not found'}`);
+        }
+        const existingAnchorText = parseData.parse?.wikitext?.['*'] ?? '';
+
+        let sectionWikitext = text.trim();
+        if (sectiontitle && !sectionWikitext.startsWith('=')) {
+          sectionWikitext = `== ${sectiontitle} ==\n` + sectionWikitext;
+        }
+
+        const combinedText = existingAnchorText
+          ? existingAnchorText.trimEnd() + '\n\n' + sectionWikitext
+          : sectionWikitext;
+
+        editPayload.section = anchorIndex;
+        editPayload.text = combinedText;
+      } else if (placementMode === 'replace') {
+        const replaceIndex = targetSectionIndex !== undefined && targetSectionIndex !== null ? String(targetSectionIndex) : String(section || '0');
+        let sectionWikitext = text.trim();
+        if (sectiontitle && !sectionWikitext.startsWith('=')) {
+          sectionWikitext = `== ${sectiontitle} ==\n` + sectionWikitext;
+        }
+        editPayload.section = replaceIndex;
+        editPayload.text = sectionWikitext;
+      } else {
+        // append_bottom
+        let cleanText = text;
+        let sTitle = sectiontitle || '';
+
+        const headerMatch = text.match(/^\s*={1,6}\s*(.*?)\s*={1,6}\s*(?:\r?\n|$)/);
+        if (headerMatch) {
+          if (!sTitle) {
+            sTitle = headerMatch[1].trim();
+          }
+          cleanText = text.slice(headerMatch[0].length).trim();
+        }
+
+        editPayload.section = 'new';
+        if (sTitle) {
+          editPayload.sectiontitle = sTitle;
+        }
+        editPayload.text = cleanText;
+      }
+    } else {
+      // Full article publishing
+      editPayload.text = text;
+      if (section !== undefined && section !== null && section !== '') {
+        editPayload.section = String(section);
+        if (sectiontitle && String(section) === 'new') {
+          editPayload.sectiontitle = sectiontitle;
+        }
       }
     }
 

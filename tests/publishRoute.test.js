@@ -271,4 +271,253 @@ describe('Publish Route (/publish)', () => {
     expect(bodyParams.get('summary')).toContain('/* प्रारंभिक जीवन */');
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
+
+  it('handles insert_after placement by fetching anchor section wikitext and splicing', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'TestUser',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: 'This is the new section body.',
+        language: 'en',
+        title: 'Draft:Physics',
+        publishMode: 'section',
+        placementMode: 'insert_after',
+        targetSectionIndex: '1',
+        targetSectionTitle: 'Early History',
+        sectiontitle: 'Modern Discoveries',
+        sourceTitle: 'Physik',
+        sourceLanguage: 'de',
+      },
+    });
+
+    // 1. Mock CSRF token response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: {
+          tokens: {
+            csrftoken: 'valid-csrf-token+\\',
+          },
+        },
+      }),
+    });
+
+    // 2. Mock parse response for anchor section 1
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        parse: {
+          title: 'Draft:Physics',
+          pageid: 12345,
+          wikitext: {
+            '*': '== Early History ==\nAncient roots of physics.',
+          },
+        },
+      }),
+    });
+
+    // 3. Mock Edit response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        edit: {
+          result: 'Success',
+          pageid: 12345,
+          title: 'Draft:Physics',
+          newrevid: 100002,
+        },
+      }),
+    });
+
+    await invokeRouter(req, res);
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+
+    // Verify parse call fetched section 1
+    const parseCall = mockFetch.mock.calls[1];
+    expect(parseCall[0]).toContain('action=parse');
+    expect(parseCall[0]).toContain('section=1');
+
+    // Verify edit call spliced the new section after section 1
+    const editCall = mockFetch.mock.calls[2];
+    const bodyParams = editCall[1].body;
+    expect(bodyParams.get('section')).toBe('1');
+    expect(bodyParams.get('text')).toBe('== Early History ==\nAncient roots of physics.\n\n== Modern Discoveries ==\nThis is the new section body.');
+    expect(bodyParams.get('summary')).toContain('Inserted section after "Early History"');
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it('handles insert_before placement by mapping to anchor section K-1', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'TestUser',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: '== Early Life ==\nBorn in Ulm.',
+        language: 'en',
+        title: 'Draft:Einstein',
+        publishMode: 'section',
+        placementMode: 'insert_before',
+        targetSectionIndex: '2',
+        targetSectionTitle: 'Career',
+        sectiontitle: 'Early Life',
+      },
+    });
+
+    // 1. CSRF token
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: { tokens: { csrftoken: 'valid-csrf-token+\\' } },
+      }),
+    });
+
+    // 2. Mock parse response for anchor section 1 (since target is 2, anchor is 2 - 1 = 1)
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        parse: {
+          title: 'Draft:Einstein',
+          pageid: 12345,
+          wikitext: {
+            '*': '== Introduction ==\nLead intro text.',
+          },
+        },
+      }),
+    });
+
+    // 3. Mock Edit response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        edit: { result: 'Success', pageid: 12345, title: 'Draft:Einstein', newrevid: 100003 },
+      }),
+    });
+
+    await invokeRouter(req, res);
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const parseCall = mockFetch.mock.calls[1];
+    expect(parseCall[0]).toContain('section=1');
+
+    const editCall = mockFetch.mock.calls[2];
+    const bodyParams = editCall[1].body;
+    expect(bodyParams.get('section')).toBe('1');
+    expect(bodyParams.get('text')).toBe('== Introduction ==\nLead intro text.\n\n== Early Life ==\nBorn in Ulm.');
+    expect(bodyParams.get('summary')).toContain('Inserted section before "Career"');
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it('handles replace placement by overwriting target section directly', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'TestUser',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: 'Completely revised legacy content.',
+        language: 'en',
+        title: 'Draft:Einstein',
+        publishMode: 'section',
+        placementMode: 'replace',
+        targetSectionIndex: '3',
+        targetSectionTitle: 'Legacy',
+        sectiontitle: 'Legacy',
+      },
+    });
+
+    // 1. CSRF token
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: { tokens: { csrftoken: 'valid-csrf-token+\\' } },
+      }),
+    });
+
+    // 2. Edit response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        edit: { result: 'Success', pageid: 12345, title: 'Draft:Einstein', newrevid: 100004 },
+      }),
+    });
+
+    await invokeRouter(req, res);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const editCall = mockFetch.mock.calls[1];
+    const bodyParams = editCall[1].body;
+    expect(bodyParams.get('section')).toBe('3');
+    expect(bodyParams.get('text')).toBe('== Legacy ==\nCompletely revised legacy content.');
+    expect(bodyParams.get('summary')).toContain('Replaced section "Legacy"');
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it('handles append_bottom placement by stripping redundant heading from text', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'TestUser',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: '== Publications ==\nList of publications.',
+        language: 'en',
+        title: 'Draft:Einstein',
+        publishMode: 'section',
+        placementMode: 'append_bottom',
+        sectiontitle: 'Publications',
+      },
+    });
+
+    // 1. CSRF token
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: { tokens: { csrftoken: 'valid-csrf-token+\\' } },
+      }),
+    });
+
+    // 2. Edit response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        edit: { result: 'Success', pageid: 12345, title: 'Draft:Einstein', newrevid: 100005 },
+      }),
+    });
+
+    await invokeRouter(req, res);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const editCall = mockFetch.mock.calls[1];
+    const bodyParams = editCall[1].body;
+    expect(bodyParams.get('section')).toBe('new');
+    expect(bodyParams.get('sectiontitle')).toBe('Publications');
+    expect(bodyParams.get('text')).toBe('List of publications.');
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
 });

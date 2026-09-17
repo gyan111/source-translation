@@ -16,12 +16,15 @@
               </div>
               <div>
                 <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100">
-                  {{ publishMode === 'section' ? 'Publish Section to Wikipedia' : 'Publish to Wikipedia' }}
+                  {{ publishMode === 'section' ? $t('publishModal.publishSectionTitle') : $t('publishModal.publishArticleTitle') }}
                 </h3>
                 <p class="text-xs text-slate-500 dark:text-zinc-400">
-                  <span v-if="publishMode === 'section' && sectionTitle">Publish section "{{ sectionTitle }}" to </span>
-                  <span v-else>Publish your translated article to </span>
-                  {{ targetLanguageName }} ({{ toLanguage }}.wikipedia.org)
+                  <span v-if="publishMode === 'section' && sectionTitle">
+                    {{ $t('publishModal.publishSectionSubtitle', { section: sectionTitle, lang: targetLanguageName, domain: `${toLanguage}.wikipedia.org` }) }}
+                  </span>
+                  <span v-else>
+                    {{ $t('publishModal.publishArticleSubtitle', { lang: targetLanguageName, domain: `${toLanguage}.wikipedia.org` }) }}
+                  </span>
                 </p>
               </div>
             </div>
@@ -76,7 +79,7 @@
               <div v-if="publishMode === 'section'" class="flex items-center justify-between text-[11px]">
                 <span class="text-slate-400 font-medium">Placement:</span>
                 <span class="font-semibold text-slate-800 dark:text-zinc-200">
-                  {{ sectionPlacement === 'new' ? 'Append as new section at end' : `Replace section §${selectedReplaceSectionIndex}` }}
+                  {{ placementPreviewText }}
                 </span>
               </div>
               <div class="flex items-center justify-between text-[11px]">
@@ -234,30 +237,86 @@
             <!-- Destination Selection Header -->
             <div class="pt-2">
               <!-- Section Placement Options (when in Section Mode) -->
-              <div v-if="publishMode === 'section'" class="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200 dark:border-white/[0.08] mb-4 space-y-2.5">
+              <div v-if="publishMode === 'section'" class="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200 dark:border-white/[0.08] mb-4 space-y-3">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-zinc-200">
                   <span class="material-icons-round text-sm text-primary-500">format_indent_increase</span>
-                  <span>Section Placement on Target Page:</span>
+                  <span>{{ $t('publishModal.placementTitle') }}</span>
                 </div>
-                <div class="space-y-2 text-xs">
+                
+                <div class="space-y-2.5 text-xs">
+                  <!-- 1. Append at bottom -->
                   <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
-                    <input type="radio" value="new" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
-                    <span>Append as new section at bottom of article</span>
+                    <input type="radio" value="append_bottom" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                    <span class="font-medium">{{ $t('publishModal.appendNew') }}</span>
                   </label>
-                  <label v-if="targetArticleSections && targetArticleSections.length" class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
-                    <input type="radio" value="replace" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
-                    <span>Replace an existing section:</span>
-                  </label>
-                  <select
-                    v-if="sectionPlacement === 'replace' && targetArticleSections && targetArticleSections.length"
-                    v-model="selectedReplaceSectionIndex"
-                    class="select-field text-xs w-full mt-1 bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
-                  >
-                    <option value="" disabled>Select section to replace...</option>
-                    <option v-for="sec in targetArticleSections" :key="sec.index" :value="sec.index">
-                      §{{ sec.index }}: {{ sec.line }}
-                    </option>
-                  </select>
+
+                  <template v-if="targetArticleSections && targetArticleSections.length">
+                    <!-- 2. Insert After Section -->
+                    <div class="space-y-1">
+                      <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                        <input type="radio" value="insert_after" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                        <span class="font-medium">{{ $t('publishModal.insertAfter') }}</span>
+                      </label>
+                      <div v-if="sectionPlacement === 'insert_after'" class="pl-6 animate-fade-in">
+                        <select
+                          v-model="selectedInsertAfterSectionIndex"
+                          class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
+                        >
+                          <option value="0">{{ $t('publishModal.leadSectionOption') }}</option>
+                          <option v-for="sec in targetArticleSections" :key="`after-${sec.index}`" :value="String(sec.index)">
+                            §{{ sec.index }}: {{ sec.line || sec.title }}
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <!-- 3. Insert Before Section -->
+                    <div class="space-y-1">
+                      <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                        <input type="radio" value="insert_before" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                        <span class="font-medium">{{ $t('publishModal.insertBefore') }}</span>
+                      </label>
+                      <div v-if="sectionPlacement === 'insert_before'" class="pl-6 animate-fade-in">
+                        <select
+                          v-model="selectedInsertBeforeSectionIndex"
+                          class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
+                        >
+                          <option value="" disabled>{{ $t('publishModal.selectReplacePlaceholder') }}</option>
+                          <option v-for="sec in targetArticleSections" :key="`before-${sec.index}`" :value="String(sec.index)">
+                            §{{ sec.index }}: {{ sec.line || sec.title }}
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <!-- 4. Replace an existing section -->
+                    <div class="space-y-1">
+                      <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                        <input type="radio" value="replace" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                        <span class="font-medium text-amber-700 dark:text-amber-400">{{ $t('publishModal.replaceExisting') }}</span>
+                      </label>
+                      <div v-if="sectionPlacement === 'replace'" class="pl-6 space-y-1.5 animate-fade-in">
+                        <select
+                          v-model="selectedReplaceSectionIndex"
+                          class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-amber-300 dark:border-amber-700/60"
+                        >
+                          <option value="" disabled>{{ $t('publishModal.selectReplacePlaceholder') }}</option>
+                          <option v-for="sec in targetArticleSections" :key="`replace-${sec.index}`" :value="String(sec.index)">
+                            §{{ sec.index }}: {{ sec.line || sec.title }}
+                          </option>
+                        </select>
+                        <p class="text-[11px] text-amber-600 dark:text-amber-400">
+                          ⚠️ {{ $t('publishModal.replaceWarning') }}
+                        </p>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Live Placement Preview Badge -->
+                <div class="mt-2 pt-2 border-t border-slate-200/60 dark:border-white/[0.06] flex items-center gap-1.5 text-[11px] text-primary-700 dark:text-primary-300 bg-primary-50/50 dark:bg-primary-950/30 p-2 rounded-xl border border-primary-200/50 dark:border-primary-800/30">
+                  <span class="material-icons-round text-xs">place</span>
+                  <span class="font-semibold">{{ placementPreviewText }}</span>
                 </div>
               </div>
 
@@ -271,7 +330,7 @@
                 <button
                   type="button"
                   @click="canPublishMainspace ? promptPublishConfirmation('mainspace') : showMainspaceRestrictedInfo()"
-                  :disabled="isPublishing || !targetTitle.trim()"
+                  :disabled="isPublishing || !targetTitle.trim() || !isPlacementValid"
                   class="w-full p-3 rounded-2xl border text-left transition-all flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   :class="[
                     !canPublishMainspace
@@ -320,7 +379,7 @@
                 <button
                   type="button"
                   @click="promptPublishConfirmation('sandbox')"
-                  :disabled="isPublishing || !targetTitle.trim()"
+                  :disabled="isPublishing || !targetTitle.trim() || !isPlacementValid"
                   class="w-full p-3 rounded-2xl border text-left transition-all flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   :class="[
                     targetTitle.trim()
@@ -349,7 +408,7 @@
                 <button
                   type="button"
                   @click="promptPublishConfirmation('draft')"
-                  :disabled="isPublishing || !targetTitle.trim()"
+                  :disabled="isPublishing || !targetTitle.trim() || !isPlacementValid"
                   class="w-full p-3 rounded-2xl border text-left transition-all flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   :class="[
                     targetTitle.trim()
@@ -465,7 +524,9 @@ export default {
       isSessionExpired: false,
       titleChecking: false,
       pageExists: null,
-      sectionPlacement: 'new',
+      sectionPlacement: 'append_bottom',
+      selectedInsertAfterSectionIndex: '0',
+      selectedInsertBeforeSectionIndex: '',
       selectedReplaceSectionIndex: '',
     };
   },
@@ -491,6 +552,45 @@ export default {
       }
       return rawTitle;
     },
+    placementPreviewText() {
+      if (this.publishMode !== 'section') return '';
+      if (this.sectionPlacement === 'append_bottom') {
+        return this.$t ? this.$t('publishModal.placementPreviewBottom') : 'Will be appended at the end of the article';
+      }
+      if (this.sectionPlacement === 'insert_after') {
+        if (this.selectedInsertAfterSectionIndex === '0') {
+          return this.$t ? this.$t('publishModal.placementPreviewLead') : 'Will be inserted right after the Lead section (before §1)';
+        }
+        const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertAfterSectionIndex));
+        const name = sec ? `§${sec.index}: ${sec.line || sec.title}` : `§${this.selectedInsertAfterSectionIndex}`;
+        return this.$t ? this.$t('publishModal.placementPreviewAfter', { section: name }) : `Will be inserted after ${name}`;
+      }
+      if (this.sectionPlacement === 'insert_before') {
+        const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertBeforeSectionIndex));
+        const name = sec ? `§${sec.index}: ${sec.line || sec.title}` : `§${this.selectedInsertBeforeSectionIndex}`;
+        return this.$t ? this.$t('publishModal.placementPreviewBefore', { section: name }) : `Will be inserted before ${name}`;
+      }
+      if (this.sectionPlacement === 'replace') {
+        const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedReplaceSectionIndex));
+        const name = sec ? `§${sec.index}: ${sec.line || sec.title}` : `§${this.selectedReplaceSectionIndex}`;
+        return this.$t ? this.$t('publishModal.placementPreviewReplace', { section: name }) : `Will replace section: ${name}`;
+      }
+      return '';
+    },
+    isPlacementValid() {
+      if (this.publishMode !== 'section') return true;
+      if (this.sectionPlacement === 'append_bottom') return true;
+      if (this.sectionPlacement === 'insert_after') {
+        return this.selectedInsertAfterSectionIndex !== '' && this.selectedInsertAfterSectionIndex !== null;
+      }
+      if (this.sectionPlacement === 'insert_before') {
+        return Boolean(this.selectedInsertBeforeSectionIndex);
+      }
+      if (this.sectionPlacement === 'replace') {
+        return Boolean(this.selectedReplaceSectionIndex);
+      }
+      return true;
+    },
   },
   watch: {
     showModal(val) {
@@ -502,6 +602,15 @@ export default {
         this.publishSuccess = false;
         this.errorMessage = '';
         this.isSessionExpired = false;
+        this.sectionPlacement = 'append_bottom';
+        this.selectedInsertAfterSectionIndex = '0';
+        if (this.targetArticleSections && this.targetArticleSections.length > 0) {
+          this.selectedInsertBeforeSectionIndex = String(this.targetArticleSections[0].index);
+          this.selectedReplaceSectionIndex = String(this.targetArticleSections[0].index);
+        } else {
+          this.selectedInsertBeforeSectionIndex = '';
+          this.selectedReplaceSectionIndex = '';
+        }
         if (this.targetTitle.trim()) {
           this.checkPageExistence(this.targetTitle.trim());
         }
@@ -511,6 +620,16 @@ export default {
       if (val && !this.targetTitle) {
         this.targetTitle = val;
         this.checkPageExistence(val.trim());
+      }
+    },
+    targetArticleSections(newSections) {
+      if (newSections && newSections.length > 0) {
+        if (!this.selectedInsertBeforeSectionIndex) {
+          this.selectedInsertBeforeSectionIndex = String(newSections[0].index);
+        }
+        if (!this.selectedReplaceSectionIndex) {
+          this.selectedReplaceSectionIndex = String(newSections[0].index);
+        }
       }
     },
   },
@@ -601,9 +720,24 @@ export default {
         };
 
         if (this.publishMode === 'section') {
-          payload.section = this.sectionPlacement === 'replace' && this.selectedReplaceSectionIndex !== ''
-            ? this.selectedReplaceSectionIndex
-            : 'new';
+          payload.publishMode = 'section';
+          payload.placementMode = this.sectionPlacement;
+          if (this.sectionPlacement === 'append_bottom') {
+            payload.section = 'new';
+          } else if (this.sectionPlacement === 'insert_after') {
+            payload.targetSectionIndex = this.selectedInsertAfterSectionIndex;
+            const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertAfterSectionIndex));
+            payload.targetSectionTitle = sec ? (sec.line || sec.title) : (this.selectedInsertAfterSectionIndex === '0' ? 'Lead' : '');
+          } else if (this.sectionPlacement === 'insert_before') {
+            payload.targetSectionIndex = this.selectedInsertBeforeSectionIndex;
+            const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertBeforeSectionIndex));
+            payload.targetSectionTitle = sec ? (sec.line || sec.title) : '';
+          } else if (this.sectionPlacement === 'replace') {
+            payload.section = this.selectedReplaceSectionIndex;
+            payload.targetSectionIndex = this.selectedReplaceSectionIndex;
+            const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedReplaceSectionIndex));
+            payload.targetSectionTitle = sec ? (sec.line || sec.title) : '';
+          }
           if (this.sectionTitle) {
             payload.sectiontitle = this.sectionTitle;
           }
