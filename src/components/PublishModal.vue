@@ -72,9 +72,9 @@
 
             <!-- Summary Details Card -->
             <div class="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900/90 border border-slate-200 dark:border-white/[0.08] space-y-2.5">
-              <div v-if="publishMode === 'section' && sectionTitle" class="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-200/60 dark:border-white/[0.06]">
+              <div v-if="publishMode === 'section' && (localSectionTitle || sectionTitle)" class="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-200/60 dark:border-white/[0.06]">
                 <span class="text-slate-400 font-medium">Section:</span>
-                <span class="font-bold text-primary-600 dark:text-primary-400">{{ sectionTitle }}</span>
+                <span class="font-bold text-primary-600 dark:text-primary-400">{{ localSectionTitle || sectionTitle }}</span>
               </div>
               <div v-if="publishMode === 'section'" class="flex items-center justify-between text-[11px]">
                 <span class="text-slate-400 font-medium">Placement:</span>
@@ -114,6 +114,11 @@
                   {{ finalFormattedTitle }}
                 </span>
               </div>
+              <!-- Untranslated Skipped Warning Badge in Confirmation -->
+              <div v-if="publishMode === 'section' && untranslatedSkippedCount > 0" class="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/30 p-2 rounded-xl border border-amber-200/60 dark:border-amber-800/40">
+                <span class="material-icons-round text-xs text-amber-600">shield</span>
+                <span>{{ $t('publishModal.untranslatedOmittedBadge', { count: untranslatedSkippedCount }) }}</span>
+              </div>
             </div>
 
             <!-- Mainspace Review Confirmation Checkbox (Anti-Spam / Anti-Vandalism) -->
@@ -134,61 +139,43 @@
               <span>All sections have been human-reviewed! Your article is ready for live publishing on Wikipedia.</span>
             </div>
 
-            <!-- Error Banner -->
-            <div v-if="errorMessage" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex flex-col gap-2">
-              <div class="flex items-start gap-2">
-                <span class="material-icons-round text-base shrink-0 mt-0.5">error_outline</span>
-                <span class="flex-1 leading-relaxed">{{ errorMessage }}</span>
-              </div>
-              <div v-if="isSessionExpired" class="pt-2 border-t border-rose-500/20 flex items-center justify-between">
-                <span class="text-[11px] opacity-90">Your draft translation is saved and won't be lost.</span>
-                <button
-                  type="button"
-                  @click="relogin"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium text-xs transition-colors cursor-pointer shadow-sm"
-                >
-                  <span class="material-icons-round text-sm">login</span>
-                  <span>Log In Again</span>
-                </button>
-              </div>
-            </div>
-
             <!-- Action Buttons -->
-            <div class="flex items-center gap-3 pt-2">
+            <div class="flex items-center justify-end gap-2.5 pt-2">
               <button
                 type="button"
                 @click="confirmingPublish = false"
+                class="btn-secondary text-xs py-2 px-4 cursor-pointer"
                 :disabled="isPublishing"
-                class="btn-secondary flex-1 py-2.5 text-xs flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
               >
-                <span class="material-icons-round text-sm">arrow_back</span>
-                <span>Back / Edit</span>
+                Back
               </button>
               <button
                 type="button"
                 @click="performFinalPublish"
                 :disabled="isPublishing || (selectedDest === 'mainspace' && !isFullyReviewed && !userAcknowledgedReview)"
-                class="btn-primary flex-1 py-2.5 text-xs flex items-center justify-center gap-1.5 cursor-pointer font-bold shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-primary text-xs py-2 px-5 flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span v-if="isPublishing" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                <span v-else class="material-icons-round text-sm">publish</span>
-                <span>{{ isPublishing ? 'Publishing...' : 'Yes, Publish Now' }}</span>
+                <span v-if="isPublishing" class="material-icons-round text-sm animate-spin">refresh</span>
+                <span v-else class="material-icons-round text-sm">check</span>
+                <span>{{ isPublishing ? 'Publishing...' : 'Confirm & Publish' }}</span>
               </button>
             </div>
           </div>
 
-          <!-- Main Publishing Form -->
-          <div v-else class="space-y-4 text-xs">
-            <!-- Article Name Input -->
+          <!-- Main Selection Body -->
+          <div v-else class="space-y-4">
+            <!-- Article Title Input -->
             <div>
               <label class="field-label mb-1.5 flex items-center justify-between">
                 <span>Article Title on Target Wiki</span>
-                <span v-if="titleChecking" class="text-[11px] text-slate-400 flex items-center gap-1">
-                  <span class="w-3 h-3 border border-primary-500 border-t-transparent rounded-full animate-spin"></span>
-                  Checking wiki...
+                <span class="text-[11px] text-slate-400 font-normal">
+                  <span v-if="titleChecking" class="text-primary-500 flex items-center gap-1">
+                    <span class="w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+                    Checking...
+                  </span>
+                  <span v-else>Target: {{ toLanguage }}.wikipedia.org</span>
                 </span>
               </label>
-              
               <div class="relative">
                 <span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">edit</span>
                 <input
@@ -215,6 +202,24 @@
               </div>
             </div>
 
+            <!-- Section Title Input (when in Section Mode) -->
+            <div v-if="publishMode === 'section'">
+              <label class="field-label mb-1.5 flex items-center justify-between">
+                <span>Section Heading on Target Wiki</span>
+                <span class="text-[11px] text-slate-400 font-normal">Heading in {{ targetLanguageName }}</span>
+              </label>
+              <div class="relative">
+                <span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">title</span>
+                <input
+                  v-model="localSectionTitle"
+                  type="text"
+                  class="input-field pl-9 py-2.5 text-xs font-semibold bg-white dark:bg-zinc-900 shadow-inner"
+                  placeholder="Enter section heading in target language (e.g. प्रारंभिक जीवन)"
+                  :disabled="isPublishing"
+                />
+              </div>
+            </div>
+
             <!-- Error Banner -->
             <div v-if="errorMessage" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex flex-col gap-2">
               <div class="flex items-start gap-2">
@@ -234,83 +239,101 @@
               </div>
             </div>
 
-            <!-- Destination Selection Header -->
-            <div class="pt-2">
-              <!-- Section Placement Options (when in Section Mode) -->
-              <div v-if="publishMode === 'section'" class="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200 dark:border-white/[0.08] mb-4 space-y-3">
-                <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-zinc-200">
-                  <span class="material-icons-round text-sm text-primary-500">format_indent_increase</span>
-                  <span>{{ $t('publishModal.placementTitle') }}</span>
+            <!-- Section Placement / New Page Info (when in Section Mode) -->
+            <div v-if="publishMode === 'section'" class="pt-1">
+              <!-- Case A: Target article does NOT exist on target wiki -> Publish directly as new page -->
+              <div v-if="pageExists === false" class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 mb-4 space-y-1.5 text-xs text-emerald-800 dark:text-emerald-300">
+                <div class="flex items-center gap-2 font-bold">
+                  <span class="material-icons-round text-emerald-600 dark:text-emerald-400 text-base">add_circle_outline</span>
+                  <span>New Article Creation</span>
+                </div>
+                <p class="text-[11px] text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                  This article does not exist on <strong>{{ toLanguage }}.wikipedia.org</strong> yet. It will be published as a new article.
+                </p>
+              </div>
+
+              <!-- Case B: Target article DOES exist on target wiki -> Show placement options directly -->
+              <div v-else class="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200 dark:border-white/[0.08] mb-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-zinc-200">
+                    <span class="material-icons-round text-sm text-primary-500">format_indent_increase</span>
+                    <span>{{ $t('publishModal.placementTitle') }}</span>
+                  </div>
+                  <div v-if="fetchingTargetSections" class="flex items-center gap-1 text-[11px] text-primary-600 dark:text-primary-400">
+                    <span class="w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Fetching sections...</span>
+                  </div>
+                  <span v-else-if="availableTargetSections.length" class="text-[11px] text-slate-400">
+                    {{ availableTargetSections.length }} sections found
+                  </span>
                 </div>
                 
                 <div class="space-y-2.5 text-xs">
-                  <!-- 1. Append at bottom -->
+                  <!-- 1. Append at bottom (Default) -->
                   <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
                     <input type="radio" value="append_bottom" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
-                    <span class="font-medium">{{ $t('publishModal.appendNew') }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-zinc-100">{{ $t('publishModal.appendNew') }}</span>
                   </label>
 
-                  <template v-if="targetArticleSections && targetArticleSections.length">
-                    <!-- 2. Insert After Section -->
-                    <div class="space-y-1">
-                      <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
-                        <input type="radio" value="insert_after" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
-                        <span class="font-medium">{{ $t('publishModal.insertAfter') }}</span>
-                      </label>
-                      <div v-if="sectionPlacement === 'insert_after'" class="pl-6 animate-fade-in">
-                        <select
-                          v-model="selectedInsertAfterSectionIndex"
-                          class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
-                        >
-                          <option value="0">{{ $t('publishModal.leadSectionOption') }}</option>
-                          <option v-for="sec in targetArticleSections" :key="`after-${sec.index}`" :value="String(sec.index)">
-                            §{{ sec.index }}: {{ sec.line || sec.title }}
-                          </option>
-                        </select>
-                      </div>
+                  <!-- 2. Insert After Section -->
+                  <div class="space-y-1">
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                      <input type="radio" value="insert_after" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                      <span class="font-medium">{{ $t('publishModal.insertAfter') }}</span>
+                    </label>
+                    <div v-if="sectionPlacement === 'insert_after'" class="pl-6 animate-fade-in">
+                      <select
+                        v-model="selectedInsertAfterSectionIndex"
+                        class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
+                      >
+                        <option value="0">{{ $t('publishModal.leadSectionOption') }}</option>
+                        <option v-for="sec in availableTargetSections" :key="`after-${sec.index}`" :value="String(sec.index)">
+                          §{{ sec.index }}: {{ sec.line || sec.title }}
+                        </option>
+                      </select>
                     </div>
+                  </div>
 
-                    <!-- 3. Insert Before Section -->
-                    <div class="space-y-1">
-                      <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
-                        <input type="radio" value="insert_before" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
-                        <span class="font-medium">{{ $t('publishModal.insertBefore') }}</span>
-                      </label>
-                      <div v-if="sectionPlacement === 'insert_before'" class="pl-6 animate-fade-in">
-                        <select
-                          v-model="selectedInsertBeforeSectionIndex"
-                          class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
-                        >
-                          <option value="" disabled>{{ $t('publishModal.selectReplacePlaceholder') }}</option>
-                          <option v-for="sec in targetArticleSections" :key="`before-${sec.index}`" :value="String(sec.index)">
-                            §{{ sec.index }}: {{ sec.line || sec.title }}
-                          </option>
-                        </select>
-                      </div>
+                  <!-- 3. Insert Before Section -->
+                  <div v-if="availableTargetSections.length" class="space-y-1">
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                      <input type="radio" value="insert_before" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                      <span class="font-medium">{{ $t('publishModal.insertBefore') }}</span>
+                    </label>
+                    <div v-if="sectionPlacement === 'insert_before'" class="pl-6 animate-fade-in">
+                      <select
+                        v-model="selectedInsertBeforeSectionIndex"
+                        class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
+                      >
+                        <option value="" disabled>{{ $t('publishModal.selectReplacePlaceholder') }}</option>
+                        <option v-for="sec in availableTargetSections" :key="`before-${sec.index}`" :value="String(sec.index)">
+                          §{{ sec.index }}: {{ sec.line || sec.title }}
+                        </option>
+                      </select>
                     </div>
+                  </div>
 
-                    <!-- 4. Replace an existing section -->
-                    <div class="space-y-1">
-                      <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
-                        <input type="radio" value="replace" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
-                        <span class="font-medium text-amber-700 dark:text-amber-400">{{ $t('publishModal.replaceExisting') }}</span>
-                      </label>
-                      <div v-if="sectionPlacement === 'replace'" class="pl-6 space-y-1.5 animate-fade-in">
-                        <select
-                          v-model="selectedReplaceSectionIndex"
-                          class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-amber-300 dark:border-amber-700/60"
-                        >
-                          <option value="" disabled>{{ $t('publishModal.selectReplacePlaceholder') }}</option>
-                          <option v-for="sec in targetArticleSections" :key="`replace-${sec.index}`" :value="String(sec.index)">
-                            §{{ sec.index }}: {{ sec.line || sec.title }}
-                          </option>
-                        </select>
-                        <p class="text-[11px] text-amber-600 dark:text-amber-400">
-                          ⚠️ {{ $t('publishModal.replaceWarning') }}
-                        </p>
-                      </div>
+                  <!-- 4. Replace an existing section -->
+                  <div v-if="availableTargetSections.length" class="space-y-1">
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-zinc-300">
+                      <input type="radio" value="replace" v-model="sectionPlacement" class="text-primary-600 focus:ring-primary-500" />
+                      <span class="font-medium text-amber-700 dark:text-amber-400">{{ $t('publishModal.replaceExisting') }}</span>
+                    </label>
+                    <div v-if="sectionPlacement === 'replace'" class="pl-6 space-y-1.5 animate-fade-in">
+                      <select
+                        v-model="selectedReplaceSectionIndex"
+                        class="select-field text-xs w-full bg-white dark:bg-zinc-800 border-amber-300 dark:border-amber-700/60"
+                      >
+                        <option value="" disabled>{{ $t('publishModal.selectReplacePlaceholder') }}</option>
+                        <option v-for="sec in availableTargetSections" :key="`replace-${sec.index}`" :value="String(sec.index)">
+                          §{{ sec.index }}: {{ sec.line || sec.title }}
+                        </option>
+                      </select>
+                      <p class="text-[11px] text-amber-600 dark:text-amber-400">
+                        ⚠️ {{ $t('publishModal.replaceWarning') }}
+                      </p>
                     </div>
-                  </template>
+                  </div>
                 </div>
 
                 <!-- Live Placement Preview Badge -->
@@ -318,8 +341,17 @@
                   <span class="material-icons-round text-xs">place</span>
                   <span class="font-semibold">{{ placementPreviewText }}</span>
                 </div>
-              </div>
 
+                <!-- Untranslated Paragraphs Skipped Notice -->
+                <div v-if="untranslatedSkippedCount > 0" class="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/30 p-2 rounded-xl border border-amber-200/60 dark:border-amber-800/40">
+                  <span class="material-icons-round text-xs text-amber-600">shield</span>
+                  <span>{{ $t('publishModal.untranslatedOmittedBadge', { count: untranslatedSkippedCount }) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Destination Selection Header -->
+            <div class="pt-2">
               <label class="field-label mb-2 text-slate-600 dark:text-zinc-300 font-bold uppercase tracking-wider text-[11px]">
                 Choose Destination to Publish:
               </label>
@@ -509,6 +541,10 @@ export default {
       type: Array,
       default: () => [],
     },
+    untranslatedSkippedCount: {
+      type: Number,
+      default: 0,
+    },
   },
   data() {
     return {
@@ -524,15 +560,24 @@ export default {
       isSessionExpired: false,
       titleChecking: false,
       pageExists: null,
+      localSectionTitle: '',
       sectionPlacement: 'append_bottom',
       selectedInsertAfterSectionIndex: '0',
       selectedInsertBeforeSectionIndex: '',
       selectedReplaceSectionIndex: '',
+      localTargetArticleSections: [],
+      fetchingTargetSections: false,
     };
   },
   computed: {
     canPublishMainspace() {
       return this.user?.canPublishMainspace === true;
+    },
+    availableTargetSections() {
+      if (this.localTargetArticleSections && this.localTargetArticleSections.length > 0) {
+        return this.localTargetArticleSections;
+      }
+      return this.targetArticleSections || [];
     },
     selectedDestLabel() {
       if (this.selectedDest === 'mainspace') return 'Mainspace (Live Article)';
@@ -554,6 +599,9 @@ export default {
     },
     placementPreviewText() {
       if (this.publishMode !== 'section') return '';
+      if (this.pageExists === false) {
+        return `Will create a new article on ${this.toLanguage}.wikipedia.org`;
+      }
       if (this.sectionPlacement === 'append_bottom') {
         return this.$t ? this.$t('publishModal.placementPreviewBottom') : 'Will be appended at the end of the article';
       }
@@ -561,17 +609,17 @@ export default {
         if (this.selectedInsertAfterSectionIndex === '0') {
           return this.$t ? this.$t('publishModal.placementPreviewLead') : 'Will be inserted right after the Lead section (before §1)';
         }
-        const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertAfterSectionIndex));
+        const sec = this.availableTargetSections.find(s => String(s.index) === String(this.selectedInsertAfterSectionIndex));
         const name = sec ? `§${sec.index}: ${sec.line || sec.title}` : `§${this.selectedInsertAfterSectionIndex}`;
         return this.$t ? this.$t('publishModal.placementPreviewAfter', { section: name }) : `Will be inserted after ${name}`;
       }
       if (this.sectionPlacement === 'insert_before') {
-        const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertBeforeSectionIndex));
+        const sec = this.availableTargetSections.find(s => String(s.index) === String(this.selectedInsertBeforeSectionIndex));
         const name = sec ? `§${sec.index}: ${sec.line || sec.title}` : `§${this.selectedInsertBeforeSectionIndex}`;
         return this.$t ? this.$t('publishModal.placementPreviewBefore', { section: name }) : `Will be inserted before ${name}`;
       }
       if (this.sectionPlacement === 'replace') {
-        const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedReplaceSectionIndex));
+        const sec = this.availableTargetSections.find(s => String(s.index) === String(this.selectedReplaceSectionIndex));
         const name = sec ? `§${sec.index}: ${sec.line || sec.title}` : `§${this.selectedReplaceSectionIndex}`;
         return this.$t ? this.$t('publishModal.placementPreviewReplace', { section: name }) : `Will replace section: ${name}`;
       }
@@ -579,6 +627,7 @@ export default {
     },
     isPlacementValid() {
       if (this.publishMode !== 'section') return true;
+      if (this.pageExists === false) return true;
       if (this.sectionPlacement === 'append_bottom') return true;
       if (this.sectionPlacement === 'insert_after') {
         return this.selectedInsertAfterSectionIndex !== '' && this.selectedInsertAfterSectionIndex !== null;
@@ -602,11 +651,13 @@ export default {
         this.publishSuccess = false;
         this.errorMessage = '';
         this.isSessionExpired = false;
+        this.localSectionTitle = this.sectionTitle || '';
         this.sectionPlacement = 'append_bottom';
         this.selectedInsertAfterSectionIndex = '0';
-        if (this.targetArticleSections && this.targetArticleSections.length > 0) {
-          this.selectedInsertBeforeSectionIndex = String(this.targetArticleSections[0].index);
-          this.selectedReplaceSectionIndex = String(this.targetArticleSections[0].index);
+        this.localTargetArticleSections = [];
+        if (this.availableTargetSections && this.availableTargetSections.length > 0) {
+          this.selectedInsertBeforeSectionIndex = String(this.availableTargetSections[0].index);
+          this.selectedReplaceSectionIndex = String(this.availableTargetSections[0].index);
         } else {
           this.selectedInsertBeforeSectionIndex = '';
           this.selectedReplaceSectionIndex = '';
@@ -621,6 +672,9 @@ export default {
         this.targetTitle = val;
         this.checkPageExistence(val.trim());
       }
+    },
+    sectionTitle(val) {
+      this.localSectionTitle = val || '';
     },
     targetArticleSections(newSections) {
       if (newSections && newSections.length > 0) {
@@ -648,6 +702,7 @@ export default {
 
     onTitleInput() {
       this.pageExists = null;
+      this.localTargetArticleSections = [];
       if (this.targetTitle.trim()) {
         this.titleChecking = true;
         this.debouncedCheck(this.targetTitle.trim());
@@ -660,6 +715,7 @@ export default {
       if (!title || !this.toLanguage) {
         this.titleChecking = false;
         this.pageExists = null;
+        this.localTargetArticleSections = [];
         return;
       }
 
@@ -673,13 +729,53 @@ export default {
 
         if (pageId && pageId !== '-1' && !pages[pageId].missing) {
           this.pageExists = true;
+          if (this.publishMode === 'section') {
+            this.fetchTargetWikiSections(title);
+          }
         } else {
           this.pageExists = false;
+          this.localTargetArticleSections = [];
         }
       } catch {
         this.pageExists = null;
+        this.localTargetArticleSections = [];
       } finally {
         this.titleChecking = false;
+      }
+    },
+
+    async fetchTargetWikiSections(title) {
+      if (!title || !this.toLanguage) return;
+      this.fetchingTargetSections = true;
+      try {
+        const url = `https://${this.toLanguage}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&origin=*`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data?.parse?.sections && Array.isArray(data.parse.sections)) {
+          this.localTargetArticleSections = data.parse.sections.map(s => ({
+            index: s.index,
+            line: s.line,
+            level: s.level,
+            number: s.number,
+            anchor: s.anchor,
+            title: s.line,
+          }));
+          if (this.localTargetArticleSections.length > 0) {
+            if (!this.selectedInsertBeforeSectionIndex) {
+              this.selectedInsertBeforeSectionIndex = String(this.localTargetArticleSections[0].index);
+            }
+            if (!this.selectedReplaceSectionIndex) {
+              this.selectedReplaceSectionIndex = String(this.localTargetArticleSections[0].index);
+            }
+          }
+        } else {
+          this.localTargetArticleSections = [];
+        }
+      } catch (err) {
+        console.error('Failed to fetch target sections:', err);
+        this.localTargetArticleSections = [];
+      } finally {
+        this.fetchingTargetSections = false;
       }
     },
 
@@ -720,26 +816,37 @@ export default {
         };
 
         if (this.publishMode === 'section') {
-          payload.publishMode = 'section';
-          payload.placementMode = this.sectionPlacement;
-          if (this.sectionPlacement === 'append_bottom') {
-            payload.section = 'new';
-          } else if (this.sectionPlacement === 'insert_after') {
-            payload.targetSectionIndex = this.selectedInsertAfterSectionIndex;
-            const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertAfterSectionIndex));
-            payload.targetSectionTitle = sec ? (sec.line || sec.title) : (this.selectedInsertAfterSectionIndex === '0' ? 'Lead' : '');
-          } else if (this.sectionPlacement === 'insert_before') {
-            payload.targetSectionIndex = this.selectedInsertBeforeSectionIndex;
-            const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedInsertBeforeSectionIndex));
-            payload.targetSectionTitle = sec ? (sec.line || sec.title) : '';
-          } else if (this.sectionPlacement === 'replace') {
-            payload.section = this.selectedReplaceSectionIndex;
-            payload.targetSectionIndex = this.selectedReplaceSectionIndex;
-            const sec = this.targetArticleSections.find(s => String(s.index) === String(this.selectedReplaceSectionIndex));
-            payload.targetSectionTitle = sec ? (sec.line || sec.title) : '';
-          }
-          if (this.sectionTitle) {
-            payload.sectiontitle = this.sectionTitle;
+          if (this.pageExists === false) {
+            let textToPublish = this.fullTranslatedText;
+            const heading = (this.localSectionTitle && this.localSectionTitle.trim()) || this.sectionTitle;
+            if (heading && !textToPublish.trim().startsWith('=')) {
+              textToPublish = `== ${heading.trim()} ==\n\n` + textToPublish.trim();
+            }
+            payload.text = textToPublish;
+          } else {
+            payload.publishMode = 'section';
+            payload.placementMode = this.sectionPlacement;
+            if (this.sectionPlacement === 'append_bottom') {
+              payload.section = 'new';
+            } else if (this.sectionPlacement === 'insert_after') {
+              payload.targetSectionIndex = this.selectedInsertAfterSectionIndex;
+              const sec = this.availableTargetSections.find(s => String(s.index) === String(this.selectedInsertAfterSectionIndex));
+              payload.targetSectionTitle = sec ? (sec.line || sec.title) : (this.selectedInsertAfterSectionIndex === '0' ? 'Lead' : '');
+            } else if (this.sectionPlacement === 'insert_before') {
+              payload.targetSectionIndex = this.selectedInsertBeforeSectionIndex;
+              const sec = this.availableTargetSections.find(s => String(s.index) === String(this.selectedInsertBeforeSectionIndex));
+              payload.targetSectionTitle = sec ? (sec.line || sec.title) : '';
+            } else if (this.sectionPlacement === 'replace') {
+              payload.section = this.selectedReplaceSectionIndex;
+              payload.targetSectionIndex = this.selectedReplaceSectionIndex;
+              const sec = this.availableTargetSections.find(s => String(s.index) === String(this.selectedReplaceSectionIndex));
+              payload.targetSectionTitle = sec ? (sec.line || sec.title) : '';
+            }
+            if (this.localSectionTitle && this.localSectionTitle.trim()) {
+              payload.sectiontitle = this.localSectionTitle.trim();
+            } else if (this.sectionTitle) {
+              payload.sectiontitle = this.sectionTitle;
+            }
           }
         }
 

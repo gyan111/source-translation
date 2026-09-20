@@ -6,68 +6,80 @@
         <div class="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
 
         <!-- Modal -->
-        <div class="relative w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] glass-strong rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200 dark:border-white/[0.1] animate-fade-in">
+        <div class="relative w-full max-w-6xl max-h-[90vh] sm:max-h-[85vh] glass-strong rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200 dark:border-white/[0.1] animate-fade-in">
           <!-- Header with Tabs -->
-          <div class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-slate-200/60 dark:border-white/[0.06] flex-shrink-0">
-            <div class="flex items-center gap-3">
-              <span class="material-icons-round text-primary-500 text-xl">preview</span>
+          <div class="flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-slate-200/60 dark:border-white/[0.06] flex-shrink-0 gap-3">
+            <div class="flex items-center gap-3 overflow-x-auto min-w-0">
+              <span class="material-icons-round text-primary-500 text-xl flex-shrink-0">preview</span>
               <!-- Tab Pills -->
-              <div class="flex bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl gap-1 text-xs font-semibold border border-slate-200/60 dark:border-white/[0.06]">
+              <div class="flex bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl gap-1 text-xs font-semibold border border-slate-200/60 dark:border-white/[0.06] overflow-x-auto flex-shrink-0">
                 <button
                   @click="activeTab = 'rendered'"
                   :class="[
-                    'px-3 py-1.5 rounded-lg transition-all',
+                    'px-3 py-1.5 rounded-lg transition-all whitespace-nowrap',
                     activeTab === 'rendered'
                       ? 'bg-white dark:bg-zinc-800 text-primary-600 dark:text-primary-400 shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                   ]"
                 >
-                  {{ $t('preview.title') }}
+                  {{ $t('preview.targetPreview') || $t('preview.title') || 'Target Preview' }}
                 </button>
                 <button
                   v-if="sourcePreviewHtml"
                   @click="activeTab = 'source'"
                   :class="[
-                    'px-3 py-1.5 rounded-lg transition-all',
+                    'px-3 py-1.5 rounded-lg transition-all whitespace-nowrap',
                     activeTab === 'source'
                       ? 'bg-white dark:bg-zinc-800 text-primary-600 dark:text-primary-400 shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                   ]"
                 >
-                  Source Preview
+                  {{ $t('preview.sourcePreview') || 'Source Preview' }}
+                </button>
+                <button
+                  v-if="sourcePreviewHtml"
+                  @click="activeTab = 'side_by_side_preview'"
+                  :class="[
+                    'px-3 py-1.5 rounded-lg transition-all whitespace-nowrap',
+                    activeTab === 'side_by_side_preview'
+                      ? 'bg-white dark:bg-zinc-800 text-primary-600 dark:text-primary-400 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  ]"
+                >
+                  {{ $t('preview.sideBySidePreview') || 'Side-by-Side Preview' }}
                 </button>
                 <button
                   @click="activeTab = 'diff'"
                   :class="[
-                    'px-3 py-1.5 rounded-lg transition-all',
+                    'px-3 py-1.5 rounded-lg transition-all whitespace-nowrap',
                     activeTab === 'diff'
                       ? 'bg-white dark:bg-zinc-800 text-primary-600 dark:text-primary-400 shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                   ]"
                 >
-                  Side-by-Side Diff
+                  {{ $t('preview.sideBySideDiff') || $t('preview.diff') || 'Side-by-Side Diff' }}
                 </button>
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-shrink-0">
               <button
                 v-if="user"
                 @click="$emit('publish-from-preview')"
-                class="btn-primary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer"
+                class="btn-primary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer whitespace-nowrap"
                 title="Publish directly to Wikipedia"
               >
                 <span class="material-icons-round text-sm">publish</span>
-                <span>Publish to Wikipedia</span>
+                <span>{{ $t('toolbar.publish') || 'Publish to Wikipedia' }}</span>
               </button>
               <a
                 v-else
                 href="/auth/login"
-                class="btn-secondary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer"
+                class="btn-secondary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer whitespace-nowrap"
                 title="Login to your Wikipedia account to publish"
               >
                 <span class="material-icons-round text-sm">lock</span>
-                <span>Login to Publish</span>
+                <span>{{ $t('header.login') || 'Login to Publish' }}</span>
               </a>
               <button @click="closePreview" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors">
                 <span class="material-icons-round text-lg">close</span>
@@ -83,18 +95,45 @@
               <p class="text-xs text-slate-500 dark:text-zinc-400">{{ $t('preview.loading') }}</p>
             </div>
 
-            <!-- Rendered HTML Tab (Styled to match target Wikipedia / Vector skin) -->
+            <!-- Rendered HTML Tab (Target Wikipedia / Vector skin) -->
             <div v-else-if="activeTab === 'rendered'" v-html="previewHtml" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="wiki-preview prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed"></div>
 
             <!-- Source Preview HTML Tab -->
             <div v-else-if="activeTab === 'source'" v-html="sourcePreviewHtml" :dir="isSourceRtl ? 'rtl' : 'ltr'" class="wiki-preview prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed"></div>
+
+            <!-- Side-by-Side Rendered Preview Tab -->
+            <div v-else-if="activeTab === 'side_by_side_preview'" class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 h-full">
+              <!-- Source Rendered -->
+              <div class="flex flex-col h-full border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-4 sm:p-5 bg-slate-50/50 dark:bg-zinc-900/40 overflow-y-auto">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/60 dark:border-white/[0.06] sticky top-0 bg-slate-50/90 dark:bg-zinc-900/90 backdrop-blur-sm z-10">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    {{ $t('preview.sourceHeading') || 'Original Source' }}
+                  </span>
+                </div>
+                <div v-html="sourcePreviewHtml" :dir="isSourceRtl ? 'rtl' : 'ltr'" class="wiki-preview prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed flex-1"></div>
+              </div>
+
+              <!-- Translated Rendered -->
+              <div class="flex flex-col h-full border border-emerald-200/60 dark:border-emerald-900/40 rounded-2xl p-4 sm:p-5 bg-emerald-50/20 dark:bg-emerald-950/10 overflow-y-auto">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-emerald-200/60 dark:border-emerald-900/40 sticky top-0 bg-emerald-50/90 dark:bg-zinc-900/90 backdrop-blur-sm z-10">
+                  <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    {{ $t('preview.targetHeading') || 'Translated Output' }}
+                  </span>
+                </div>
+                <div v-html="previewHtml" :dir="isTargetRtl ? 'rtl' : 'ltr'" class="wiki-preview prose prose-slate dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed flex-1"></div>
+              </div>
+            </div>
 
             <!-- Side-by-Side Diff Tab -->
             <div v-else-if="activeTab === 'diff'" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
               <!-- Source -->
               <div class="flex flex-col h-full">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Original Wikitext</span>
+                  <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                    {{ $t('preview.originalWikitext') || 'Original Wikitext' }}
+                  </span>
                 </div>
                 <pre :dir="isSourceRtl ? 'rtl' : 'ltr'" class="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200/60 dark:border-white/[0.06] text-xs font-mono text-slate-700 dark:text-zinc-300 overflow-x-auto whitespace-pre-wrap flex-1 max-h-[60vh]">{{ sourceWikitext || 'No source content' }}</pre>
               </div>
@@ -102,7 +141,9 @@
               <!-- Translated -->
               <div class="flex flex-col h-full">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Translated Wikitext</span>
+                  <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    {{ $t('preview.translatedWikitext') || 'Translated Wikitext' }}
+                  </span>
                 </div>
                 <pre :dir="isTargetRtl ? 'rtl' : 'ltr'" class="p-3.5 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 text-xs font-mono text-slate-700 dark:text-zinc-200 overflow-x-auto whitespace-pre-wrap flex-1 max-h-[60vh]">{{ translatedWikitext || 'No translated content' }}</pre>
               </div>

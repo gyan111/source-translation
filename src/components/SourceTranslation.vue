@@ -145,95 +145,63 @@
               {{ $t('warnings.articleExistsBody') }}
               <a :href="articleExistsUrl" target="_blank" class="underline font-medium ml-1">{{ $t('warnings.articleExistsLink') }}</a>
               <div class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                💡 <strong>Recommended:</strong> Use <em>Translate by Section</em> to expand this article without overwriting existing content.
+                💡 <strong>Recommended:</strong> You can translate and publish individual sections to expand this article without overwriting existing content.
               </div>
             </div>
           </div>
-          <button
-            v-if="articleViewMode !== 'section' && paragraphs.length"
-            type="button"
-            @click="articleViewMode = 'section'"
-            class="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500 text-white font-semibold text-xs shadow-sm hover:bg-amber-600 transition-colors flex items-center gap-1.5 cursor-pointer self-end sm:self-auto"
-          >
-            <span class="material-icons-round text-sm">view_agenda</span>
-            <span>Switch to Section Mode</span>
-          </button>
         </div>
       </div>
 
-      <!-- Action Bar & Mode Switcher (When paragraphs are loaded) -->
+      <!-- Action Bar & Section Navigator (When paragraphs are loaded) -->
       <div v-if="currentMode === 'article' && paragraphs.length" class="space-y-3 pt-3.5 mt-3.5 border-t border-slate-200/70 dark:border-white/[0.06]">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <!-- Two Distinct Mode Toggle Buttons -->
-          <div class="flex items-center gap-1 bg-slate-100/90 dark:bg-zinc-900/90 p-1 rounded-2xl border border-slate-200/80 dark:border-white/[0.08] shadow-inner">
+          <!-- Translation & Top Action Buttons -->
+          <div class="flex items-center gap-2">
+            <!-- Translate Button -->
             <button
-              type="button"
-              @click="articleViewMode = 'all'"
-              :class="[
-                'px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer select-none',
-                articleViewMode === 'all'
-                  ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-zinc-400'
-              ]"
+              v-if="!isTranslatingAll"
+              @click="activeSectionFilter === 'all' ? translateAllPending() : translateActiveSectionPending()"
+              :disabled="!activeSectionPendingCount"
+              class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <span class="material-icons-round text-sm">article</span>
-              <span>{{ $t('toolbar.translateWholeArticle') }}</span>
-            </button>
-            <button
-              type="button"
-              @click="articleViewMode = 'section'"
-              :class="[
-                'px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer select-none',
-                articleViewMode === 'section'
-                  ? 'bg-white dark:bg-zinc-700 text-primary-600 dark:text-primary-300 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-zinc-400'
-              ]"
-            >
-              <span class="material-icons-round text-sm">view_agenda</span>
-              <span>{{ $t('toolbar.translateBySection') }}</span>
-              <span v-if="sectionsSummary.length" class="text-[10px] px-1.5 py-0.2 rounded-full bg-primary-500/10 text-primary-600 dark:text-primary-400 font-bold ml-0.5">
-                {{ sectionsSummary.length }}
+              <span class="material-icons-round text-sm">auto_fix_high</span>
+              <span v-if="activeSectionPendingCount > 0">
+                {{ activeSectionFilter === 'all' ? `Translate All Pending (${activeSectionPendingCount})` : `Translate This Section (${activeSectionPendingCount})` }}
+              </span>
+              <span v-else>
+                {{ activeSectionFilter === 'all' ? 'All Translated ✓' : 'Section Translated ✓' }}
               </span>
             </button>
-          </div>
+            <button
+              v-else
+              @click="cancelTranslateAll"
+              class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer"
+            >
+              <span class="material-icons-round text-sm">stop_circle</span>
+              <span>Cancel Translation</span>
+            </button>
 
-          <!-- Translation Action Buttons -->
-          <div class="flex items-center gap-2">
-            <template v-if="articleViewMode === 'all'">
-              <button v-if="!isTranslatingAll" @click="translateAllPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
-                <span class="material-icons-round text-sm">auto_fix_high</span>
-                <span>{{ $t('toolbar.translateAllPending') }}</span>
-              </button>
-              <button v-else @click="cancelTranslateAll" class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer">
-                <span class="material-icons-round text-sm">stop_circle</span>
-                <span>Cancel Translation</span>
-              </button>
-            </template>
-            <template v-else>
-              <button v-if="!isTranslatingAll" @click="translateActiveSectionPending" class="btn-success text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm" :disabled="!activeSectionPendingCount">
-                <span class="material-icons-round text-sm">auto_fix_high</span>
-                <span>{{ $t('toolbar.translateActiveSection') }} ({{ activeSectionPendingCount }})</span>
-              </button>
-              <button v-else @click="cancelTranslateAll" class="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm animate-pulse cursor-pointer">
-                <span class="material-icons-round text-sm">stop_circle</span>
-                <span>Cancel Translation</span>
-              </button>
-            </template>
+            <!-- Preview & Publish Button on Top -->
+            <button
+              @click="previewAction"
+              :disabled="!hasAnyTranslationInActiveSection"
+              class="px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 active:bg-primary-700 text-white font-semibold text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Preview rendered content and publish to Wikipedia"
+            >
+              <span class="material-icons-round text-sm">visibility</span>
+              <span>Preview & Publish</span>
+            </button>
           </div>
 
           <!-- Global Utilities -->
           <div class="flex items-center gap-2 flex-wrap">
-            <button @click="previewAction" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
-              <span class="material-icons-round text-sm text-amber-500">visibility</span>
-              <span>{{ $t('toolbar.preview') }}</span>
-            </button>
-            <button @click="copyAll" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
+            <button @click="copyAll" :disabled="!hasAnyTranslationInActiveSection" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40" :title="activeSectionFilter === 'all' ? 'Copy entire article wikitext to clipboard' : 'Copy section wikitext to clipboard'">
               <span class="material-icons-round text-sm text-slate-400">content_copy</span>
-              <span>{{ articleViewMode === 'section' ? $t('toolbar.copySection') : $t('toolbar.copyAll') }}</span>
+              <span>{{ activeSectionFilter === 'all' ? 'Copy Article' : 'Copy Section' }}</span>
             </button>
-            <button @click="exportWikitext" :disabled="!hasAnyTranslation" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40">
+            <button @click="exportWikitext" :disabled="!hasAnyTranslationInActiveSection" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 disabled:opacity-40" :title="activeSectionFilter === 'all' ? 'Export entire article wikitext file' : 'Export section wikitext file'">
               <span class="material-icons-round text-sm text-slate-400">download</span>
-              <span>{{ articleViewMode === 'section' ? $t('toolbar.exportSection') : $t('toolbar.exportWikitext') }}</span>
+              <span>{{ activeSectionFilter === 'all' ? 'Export Article' : 'Export Section' }}</span>
             </button>
             <button @click="confirmReset" class="btn-secondary text-xs py-2 px-3 flex items-center gap-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40">
               <span class="material-icons-round text-sm">restart_alt</span>
@@ -242,22 +210,51 @@
           </div>
         </div>
 
-        <!-- Horizontal Section Navigator (Scrollable Pills Bar) -->
-        <div v-if="sectionsSummary.length" class="pt-2 border-t border-slate-200/50 dark:border-white/[0.04]">
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <div class="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-300">
-              <span class="material-icons-round text-sm text-primary-500">menu_book</span>
-              <span>Article Sections ({{ sectionsSummary.length }})</span>
-              <span v-if="articleViewMode === 'section' && currentActiveSection" class="text-primary-600 dark:text-primary-400 font-semibold truncate max-w-[260px]">
-                — Section: {{ currentActiveSection.title }}
-              </span>
+        <!-- Horizontal Section Navigator with Big Percentage Number -->
+        <div v-if="sectionsSummary.length" class="pt-3 border-t border-slate-200/50 dark:border-white/[0.04]">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
+            <!-- Active Section / All Info with Big Percentage Number -->
+            <div class="flex items-center gap-3">
+              <!-- Big Percentage Badge with Dynamic Color -->
+              <div
+                class="px-3 py-1.5 rounded-2xl border flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-xs transition-all select-none shrink-0"
+                :class="activeSectionPercentClass"
+              >
+                {{ activeSectionPercent }}%
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-zinc-100">
+                  <template v-if="activeSectionFilter === 'all'">
+                    <span class="text-primary-600 dark:text-primary-400">All</span>
+                    <span class="truncate max-w-[200px] sm:max-w-xs">Entire Article</span>
+                  </template>
+                  <template v-else>
+                    <span class="text-primary-600 dark:text-primary-400">§{{ currentActiveSection?.index }}</span>
+                    <span class="truncate max-w-[200px] sm:max-w-xs">{{ currentActiveSection?.title }}</span>
+                  </template>
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center gap-2 mt-0.5">
+                  <template v-if="activeSectionFilter === 'all'">
+                    <span>{{ translatedCount }}/{{ paragraphs.length }} paragraphs translated</span>
+                    <span class="text-slate-300 dark:text-zinc-700">•</span>
+                    <span>{{ articleTranslatedSectionsCount }}/{{ sectionsSummary.length }} sections fully translated</span>
+                  </template>
+                  <template v-else>
+                    <span>{{ activeSectionTranslatedCount }}/{{ activeSectionTotalCount }} paragraphs translated</span>
+                    <span class="text-slate-300 dark:text-zinc-700">•</span>
+                    <span>Overall: {{ articleTranslatedSectionsCount }}/{{ sectionsSummary.length }} sections ({{ translationProgress }}%)</span>
+                  </template>
+                </div>
+              </div>
             </div>
-            <div v-if="articleViewMode === 'section'" class="flex items-center gap-1 shrink-0">
+
+            <!-- Navigation Chevrons -->
+            <div class="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
               <button
                 type="button"
                 @click="goToPrevSection"
-                :disabled="activeSectionIndex === 0"
-                class="p-1 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center"
+                :disabled="activeSectionFilter === 'all'"
+                class="p-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center shadow-xs"
                 :title="$t('section.prevSection')"
               >
                 <span class="material-icons-round text-base">chevron_left</span>
@@ -265,8 +262,8 @@
               <button
                 type="button"
                 @click="goToNextSection"
-                :disabled="activeSectionIndex === sectionsSummary.length - 1"
-                class="p-1 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center"
+                :disabled="activeSectionFilter === sectionsSummary[sectionsSummary.length - 1]?.index"
+                class="p-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-xs text-slate-600 dark:text-zinc-300 flex items-center shadow-xs"
                 :title="$t('section.nextSection')"
               >
                 <span class="material-icons-round text-base">chevron_right</span>
@@ -276,14 +273,36 @@
 
           <!-- Horizontal Scrollable Pills -->
           <div class="flex items-center gap-2 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+            <!-- 1. All Pill (Default) -->
+            <button
+              type="button"
+              @click="activeSectionFilter = 'all'"
+              :class="[
+                'shrink-0 px-3.5 py-2 rounded-2xl text-xs font-medium border flex items-center gap-2 transition-all cursor-pointer select-none',
+                activeSectionFilter === 'all'
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/25 ring-2 ring-primary-400/30'
+                  : 'bg-white dark:bg-zinc-900 border-slate-200/80 dark:border-white/[0.08] hover:border-primary-300 dark:hover:border-primary-700 text-slate-700 dark:text-zinc-300 shadow-2xs'
+              ]"
+            >
+              <span class="font-bold text-[11px]">All</span>
+              <span class="truncate font-semibold">Entire Article</span>
+              <span
+                class="text-[10px] px-1.5 py-0.2 rounded-full font-bold"
+                :class="activeSectionFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'"
+              >
+                {{ translatedCount }}/{{ paragraphs.length }}
+              </span>
+            </button>
+
+            <!-- 2. Section Pills -->
             <button
               v-for="sec in sectionsSummary"
               :key="sec.index"
               type="button"
-              @click="activeSectionIndex = sec.index; articleViewMode = 'section'"
+              @click="activeSectionFilter = sec.index; activeSectionIndex = sec.index;"
               :class="[
                 'shrink-0 px-3 py-2 rounded-2xl text-xs font-medium border flex items-center gap-2 transition-all cursor-pointer select-none',
-                articleViewMode === 'section' && activeSectionIndex === sec.index
+                activeSectionFilter === sec.index
                   ? 'bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/25 ring-2 ring-primary-400/30'
                   : 'bg-white dark:bg-zinc-900 border-slate-200/80 dark:border-white/[0.08] hover:border-primary-300 dark:hover:border-primary-700 text-slate-700 dark:text-zinc-300 shadow-2xs'
               ]"
@@ -292,7 +311,7 @@
               <span class="truncate max-w-[150px] font-semibold">{{ sec.title }}</span>
               <span
                 class="text-[10px] px-1.5 py-0.2 rounded-full font-bold"
-                :class="articleViewMode === 'section' && activeSectionIndex === sec.index ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'"
+                :class="activeSectionFilter === sec.index ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'"
               >
                 {{ sec.translatedCount }}/{{ sec.paragraphCount }}
               </span>
@@ -837,8 +856,10 @@
         </div>
       </div>
 
-      <!-- Sections List -->
+
+      <!-- Sections List (Section / All Translation Mode) -->
       <div v-if="paragraphs.length">
+        <!-- Paragraphs for the Active Section or All -->
         <div class="space-y-3 mb-6">
           <ParagraphSection
             v-for="para in visibleParagraphs"
@@ -862,30 +883,40 @@
           />
         </div>
 
-        <!-- Publish Section Card -->
-        <div v-if="hasAnyTranslation" class="card-elevated p-5 sm:p-6 mb-12 border-t-4 border-primary-500 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <!-- Publish Card at Bottom -->
+        <div v-if="hasAnyTranslationInActiveSection" class="card-elevated p-5 sm:p-6 mb-12 border-t-4 border-primary-500 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mb-1">
               <span class="material-icons-round text-primary-500">publish</span>
-              <span>{{ articleViewMode === 'section' ? $t('section.readyToPublish', { title: currentActiveSection?.title || '' }) : $t('section.readyToPublishArticle') }}</span>
+              <span v-if="activeSectionFilter === 'all'">{{ $t('section.readyToPublishArticle') || 'Ready to Publish to Wikipedia?' }}</span>
+              <span v-else>{{ $t('section.readyToPublish', { title: currentActiveSection?.title || '' }) }}</span>
             </h3>
             <p class="text-xs text-slate-500 dark:text-zinc-400">
-              <span v-if="articleViewMode === 'section'">
-                {{ $t('section.publishDescription', { lang: targetLanguageName }) }}
-              </span>
-              <span v-else>
-                {{ $t('section.publishArticleDescription', { lang: targetLanguageName }) }}
-              </span>
+              <span v-if="activeSectionFilter === 'all'">{{ $t('section.publishArticleDescription', { lang: targetLanguageName }) || 'Publish your translated article directly to Wikipedia.' }}</span>
+              <span v-else>{{ $t('section.publishDescription', { lang: targetLanguageName }) }}</span>
+            </p>
+            <p v-if="activeSectionPendingCount > 0" class="mt-2 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5 font-medium">
+              <span class="material-icons-round text-sm">warning</span>
+              <span v-if="activeSectionFilter === 'all'">{{ activeSectionPendingCount }} untranslated paragraph(s) will be omitted from publish.</span>
+              <span v-else>{{ activeSectionPendingCount }} untranslated paragraph(s) in this section will be omitted from publish.</span>
             </p>
           </div>
-          <div>
+          <div class="flex items-center gap-2.5 shrink-0">
+            <button
+              @click="previewAction"
+              class="btn-secondary text-xs py-3 px-4 flex items-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap"
+              title="Preview rendered content before publishing"
+            >
+              <span class="material-icons-round text-sm text-amber-500">visibility</span>
+              <span>Preview</span>
+            </button>
             <button
               v-if="user"
-              @click="openPublishModal"
+              @click="activeSectionFilter === 'all' ? openFullPublishModal() : openSectionPublishModal(currentActiveSection)"
               class="btn-primary text-xs py-3 px-6 flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap"
             >
               <span class="material-icons-round text-base">publish</span>
-              <span class="font-bold">{{ articleViewMode === 'section' ? $t('toolbar.publishSection') : $t('toolbar.publish') }}</span>
+              <span class="font-bold">{{ activeSectionFilter === 'all' ? ($t('section.publishArticle') || 'Publish Entire Article') : 'Publish This Section' }}</span>
             </button>
             <a
               v-else
@@ -1210,7 +1241,7 @@
       :isTargetRtl="isTargetRtl"
       :user="user"
       @close-preview="closePreview"
-      @publish-from-preview="openPublishModal"
+      @publish-from-preview="handlePublishFromPreview"
     />
 
     <!-- Publish Dialog Modal -->
@@ -1222,14 +1253,15 @@
       :fromLanguage="fromLanguage"
       :sourceTitle="articleInput"
       :targetLanguageName="targetLanguageName"
-      :fullTranslatedText="articleViewMode === 'section' ? activeSectionTranslatedText : fullTranslatedText"
-      :reviewedCount="articleViewMode === 'section' ? (currentActiveSection?.reviewedCount || 0) : reviewedCount"
-      :totalSectionsCount="articleViewMode === 'section' ? (currentActiveSection?.paragraphCount || 1) : paragraphs.length"
-      :isFullyReviewed="articleViewMode === 'section' ? (currentActiveSection && currentActiveSection.reviewedCount === currentActiveSection.paragraphCount) : isFullyReviewed"
+      :fullTranslatedText="publishModalText"
+      :reviewedCount="publishModalReviewedCount"
+      :totalSectionsCount="publishModalTotalCount"
+      :isFullyReviewed="publishModalIsFullyReviewed"
+      :untranslatedSkippedCount="publishModalSkippedCount"
       :modificationPercent="totalModificationPercent"
       :mtEngine="translationService"
-      :publishMode="articleViewMode === 'section' ? 'section' : 'full'"
-      :sectionTitle="articleViewMode === 'section' ? (currentActiveSection?.title || '') : ''"
+      :publishMode="publishModalMode"
+      :sectionTitle="publishModalSectionTitle"
       :targetArticleSections="targetArticleSections"
       @close="showPublishModal = false"
       @published="handleArticlePublished"
@@ -1286,12 +1318,14 @@ export default {
       articleExistsUrl: '',
       articleExistsTitle: '',
 
-      // Section Translation State
-      articleViewMode: 'all', // 'all' (Translate Whole Article) | 'section' (Translate by Section)
+      // Section Translation & Publish State
+      activeSectionFilter: 'all', // 'all' | number
       activeSectionIndex: 0,
       sectionsList: [],
       targetArticleSections: [],
       fetchingTargetSections: false,
+      publishModalMode: 'full', // 'full' | 'section'
+      targetPublishSection: null, // Section object when publishing a section
 
       // Wikitext explicit mode state
       showWikitextBox: false,
@@ -1754,27 +1788,111 @@ export default {
       if (!this.sectionsSummary.length) return null;
       return this.sectionsSummary.find(s => s.index === this.activeSectionIndex) || this.sectionsSummary[0];
     },
+    activeSectionParagraphs() {
+      if (!this.paragraphs || !this.paragraphs.length) return [];
+      const paras = this.paragraphs.filter(p => p.sectionIndex === this.activeSectionIndex);
+      return paras.length ? paras : this.paragraphs;
+    },
+    activeSectionTotalCount() {
+      return this.activeSectionParagraphs.length;
+    },
+    activeSectionTranslatedCount() {
+      return this.activeSectionParagraphs.filter(p => Boolean(p.translation && p.translation.trim())).length;
+    },
     visibleParagraphs() {
-      if (this.articleViewMode === 'all') {
+      if (this.activeSectionFilter === 'all' || !this.sectionsSummary.length) {
         return this.paragraphs;
       }
-      return this.paragraphs.filter(p => p.sectionIndex === this.activeSectionIndex);
+      return this.activeSectionParagraphs;
     },
-    activeSectionParagraphs() {
-      return this.paragraphs.filter(p => p.sectionIndex === this.activeSectionIndex);
+    activeSectionPercent() {
+      if (this.activeSectionFilter === 'all') {
+        return this.translationProgress;
+      }
+      if (!this.activeSectionTotalCount) return 0;
+      return Math.round((this.activeSectionTranslatedCount / this.activeSectionTotalCount) * 100);
     },
-    activeSectionTranslatedText() {
-      const text = this.activeSectionParagraphs.map(p => p.translation || p.source).join('\n\n');
-      return resolveOrphanReferences(text, this.rawWikitext);
+    activeSectionPercentClass() {
+      const pct = this.activeSectionPercent;
+      if (pct === 100) return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+      if (pct > 0) return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
+      return 'bg-slate-200/80 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 border-slate-300/50 dark:border-zinc-700';
+    },
+    articleTranslatedSectionsCount() {
+      return this.sectionsSummary.filter(s => s.translatedCount === s.paragraphCount && s.paragraphCount > 0).length;
     },
     hasAnyTranslationInActiveSection() {
+      if (this.currentMode === 'wikitext') {
+        return Boolean(this.wikitextTranslated && this.wikitextTranslated.trim());
+      }
+      if (this.currentMode === 'template') {
+        return Boolean(this.templateTranslated && this.templateTranslated.trim());
+      }
+      if (this.activeSectionFilter === 'all') {
+        return this.paragraphs.some(p => Boolean(p.translation && p.translation.trim()));
+      }
       return this.activeSectionParagraphs.some(p => Boolean(p.translation && p.translation.trim()));
     },
     activeSectionPendingCount() {
-      return this.activeSectionParagraphs.filter(p => !p.translation || p.status === 'pending').length;
+      if (this.activeSectionFilter === 'all') {
+        return this.paragraphs.filter(p => !p.translation || p.status === 'pending' || p.status === 'error').length;
+      }
+      return this.activeSectionParagraphs.filter(p => !p.translation || p.status === 'pending' || p.status === 'error').length;
+    },
+    activeSectionTranslatedText() {
+      // STRICT: Only include non-empty translations. NEVER fall back to p.source!
+      const translatedParts = this.activeSectionParagraphs
+        .filter(p => Boolean(p.translation && p.translation.trim()))
+        .map(p => p.translation.trim());
+      const text = translatedParts.join('\n\n');
+      return resolveOrphanReferences(text, this.rawWikitext);
+    },
+    publishModalText() {
+      if (this.publishModalMode === 'full') {
+        return this.fullTranslatedText;
+      }
+      return this.activeSectionTranslatedText;
+    },
+    publishModalSkippedCount() {
+      if (this.publishModalMode === 'full') {
+        return this.paragraphs.filter(p => !p.translation || !p.translation.trim()).length;
+      }
+      return this.activeSectionPendingCount;
+    },
+    publishModalSectionTitle() {
+      if (this.publishModalMode === 'full') {
+        return '';
+      }
+      const headingPara = this.activeSectionParagraphs.find(p => p.isHeading);
+      if (headingPara && headingPara.translation && headingPara.translation.trim()) {
+        return headingPara.translation.replace(/^=+|=+$/g, '').trim();
+      }
+      return this.currentActiveSection ? this.currentActiveSection.title : '';
+    },
+    publishModalReviewedCount() {
+      if (this.publishModalMode === 'full') {
+        return this.reviewedCount;
+      }
+      return this.currentActiveSection?.reviewedCount || 0;
+    },
+    publishModalTotalCount() {
+      if (this.publishModalMode === 'full') {
+        return this.paragraphs.length;
+      }
+      return this.currentActiveSection?.paragraphCount || 1;
+    },
+    publishModalIsFullyReviewed() {
+      if (this.publishModalMode === 'full') {
+        return this.isFullyReviewed;
+      }
+      return Boolean(this.currentActiveSection && this.currentActiveSection.reviewedCount === this.currentActiveSection.paragraphCount);
     },
     fullTranslatedText() {
-      return this.paragraphs.map(p => p.translation || '').filter(Boolean).join('\n\n');
+      const text = this.paragraphs
+        .filter(p => Boolean(p.translation && p.translation.trim()))
+        .map(p => p.translation.trim())
+        .join('\n\n');
+      return resolveOrphanReferences(text, this.rawWikitext);
     },
     hasAnyTranslation() {
       if (this.currentMode === 'wikitext') {
@@ -1783,10 +1901,7 @@ export default {
       if (this.currentMode === 'template') {
         return Boolean(this.templateTranslated && this.templateTranslated.trim());
       }
-      if (this.articleViewMode === 'section') {
-        return this.hasAnyTranslationInActiveSection;
-      }
-      return this.paragraphs.some(p => p.translation);
+      return this.hasAnyTranslationInActiveSection;
     },
     previewModalSourceWikitext() {
       if (this.currentMode === 'wikitext') {
@@ -1795,10 +1910,10 @@ export default {
       if (this.currentMode === 'template') {
         return this.templateInput || '';
       }
-      if (this.articleViewMode === 'section') {
-        return this.activeSectionParagraphs.map(p => p.source).join('\n\n');
+      if (this.activeSectionFilter === 'all') {
+        return this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
       }
-      return this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
+      return this.activeSectionParagraphs.map(p => p.source).join('\n\n');
     },
     previewModalTranslatedWikitext() {
       if (this.currentMode === 'wikitext') {
@@ -1807,10 +1922,10 @@ export default {
       if (this.currentMode === 'template') {
         return this.templateTranslated || '';
       }
-      if (this.articleViewMode === 'section') {
-        return this.activeSectionTranslatedText;
+      if (this.activeSectionFilter === 'all') {
+        return this.fullTranslatedText;
       }
-      return this.fullTranslatedText;
+      return this.activeSectionTranslatedText;
     },
     translatedCount() {
       return this.paragraphs.filter(p => p.status === 'translated').length;
@@ -1932,7 +2047,7 @@ reviewedCount() {
     showTemplateBox() { this.saveState(); },
     templateInput() { this.saveState(); },
     templateTranslated() { this.saveState(); },
-    articleViewMode() { this.saveState(); },
+    activeSectionFilter() { this.saveState(); },
     activeSectionIndex() { this.saveState(); },
   },
 
@@ -2119,6 +2234,40 @@ reviewedCount() {
       this.showToast('Translation cancelled.', 'warning');
     },
 
+    getParagraphsForSection(secIndex) {
+      if (!this.paragraphs || !this.paragraphs.length) return [];
+      return this.paragraphs.filter(p => p.sectionIndex === secIndex);
+    },
+
+    goToPrevSection() {
+      if (!this.sectionsSummary.length) return;
+      if (this.activeSectionFilter === 'all') return;
+      const currentIndexInSummary = this.sectionsSummary.findIndex(s => s.index === this.activeSectionFilter);
+      if (currentIndexInSummary === 0) {
+        this.activeSectionFilter = 'all';
+      } else if (currentIndexInSummary > 0) {
+        const prevSec = this.sectionsSummary[currentIndexInSummary - 1];
+        this.activeSectionFilter = prevSec.index;
+        this.activeSectionIndex = prevSec.index;
+      }
+    },
+
+    goToNextSection() {
+      if (!this.sectionsSummary.length) return;
+      if (this.activeSectionFilter === 'all') {
+        const firstSec = this.sectionsSummary[0];
+        this.activeSectionFilter = firstSec.index;
+        this.activeSectionIndex = firstSec.index;
+        return;
+      }
+      const currentIndexInSummary = this.sectionsSummary.findIndex(s => s.index === this.activeSectionFilter);
+      if (currentIndexInSummary >= 0 && currentIndexInSummary < this.sectionsSummary.length - 1) {
+        const nextSec = this.sectionsSummary[currentIndexInSummary + 1];
+        this.activeSectionFilter = nextSec.index;
+        this.activeSectionIndex = nextSec.index;
+      }
+    },
+
     async translateActiveSectionPending() {
       if (this.isTranslatingAll) return;
       if (!this.toLanguage) {
@@ -2132,7 +2281,7 @@ reviewedCount() {
 
       const pendingIndices = this.paragraphs
         .map((p, idx) => ({ p, idx }))
-        .filter(({ p }) => p.sectionIndex === this.activeSectionIndex && (p.status === 'pending' || !p.translation))
+        .filter(({ p }) => p.sectionIndex === this.activeSectionIndex && (p.status === 'pending' || p.status === 'error' || !p.translation))
         .map(({ idx }) => idx);
 
       if (!pendingIndices.length) {
@@ -2154,7 +2303,7 @@ reviewedCount() {
         }
       }, 1000);
 
-      const sectionTitle = this.currentActiveSection?.title || 'Active section';
+      const sectionTitle = this.currentActiveSection?.title || `Section ${this.activeSectionIndex}`;
       this.showToast(this.$t('section.translatingItems', { count: pendingIndices.length, title: sectionTitle }), 'warning');
 
       for (let i = 0; i < pendingIndices.length; i++) {
@@ -2189,20 +2338,53 @@ reviewedCount() {
       }
     },
 
-    goToPrevSection() {
-      if (!this.sectionsSummary.length) return;
-      const currentIndexInSummary = this.sectionsSummary.findIndex(s => s.index === this.activeSectionIndex);
-      if (currentIndexInSummary > 0) {
-        this.activeSectionIndex = this.sectionsSummary[currentIndexInSummary - 1].index;
+    openSectionPublishModal(sec) {
+      if (!this.hasAnyTranslationInActiveSection) {
+        this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
+        return;
+      }
+      if (!this.toLanguage) {
+        this.toLanguageError = true;
+        this.showToast(this.$t('warnings.selectTarget'), 'warning');
+        return;
+      }
+      if (sec && typeof sec.index === 'number') {
+        this.activeSectionIndex = sec.index;
+        this.activeSectionFilter = sec.index;
+      }
+      this.publishModalMode = 'section';
+      this.targetPublishSection = this.currentActiveSection;
+      this.showPublishModal = true;
+    },
+
+    openFullPublishModal() {
+      if (!this.hasAnyTranslation) {
+        this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
+        return;
+      }
+      if (!this.toLanguage) {
+        this.toLanguageError = true;
+        this.showToast(this.$t('warnings.selectTarget'), 'warning');
+        return;
+      }
+      this.publishModalMode = 'full';
+      this.targetPublishSection = null;
+      this.showPublishModal = true;
+    },
+
+    openPublishModal() {
+      if (this.activeSectionFilter === 'all' || this.currentMode !== 'article') {
+        this.openFullPublishModal();
+      } else {
+        this.openSectionPublishModal(this.currentActiveSection);
       }
     },
 
-    goToNextSection() {
-      if (!this.sectionsSummary.length) return;
-      const currentIndexInSummary = this.sectionsSummary.findIndex(s => s.index === this.activeSectionIndex);
-      if (currentIndexInSummary >= 0 && currentIndexInSummary < this.sectionsSummary.length - 1) {
-        this.activeSectionIndex = this.sectionsSummary[currentIndexInSummary + 1].index;
-      }
+    handlePublishFromPreview() {
+      this.showPreview = false;
+      this.$nextTick(() => {
+        this.openPublishModal();
+      });
     },
 
     deleteCurrentApiKey() {
@@ -2252,8 +2434,8 @@ reviewedCount() {
         missingLinkStrategy: this.missingLinkStrategy,
         paragraphs: this.paragraphs,
         rawWikitext: this.rawWikitext,
-        articleViewMode: this.articleViewMode,
         activeSectionIndex: this.activeSectionIndex,
+        activeSectionFilter: this.activeSectionFilter,
         showWikitextBox: this.showWikitextBox,
         showTemplateBox: this.showTemplateBox,
         wikitextInput: this.wikitextInput,
@@ -2288,8 +2470,8 @@ reviewedCount() {
           if (parsed.missingLinkStrategy) this.missingLinkStrategy = parsed.missingLinkStrategy;
           if (parsed.paragraphs) this.paragraphs = parsed.paragraphs;
           if (parsed.rawWikitext) this.rawWikitext = parsed.rawWikitext;
-          if (parsed.articleViewMode) this.articleViewMode = parsed.articleViewMode;
           if (typeof parsed.activeSectionIndex === 'number') this.activeSectionIndex = parsed.activeSectionIndex;
+          if (parsed.activeSectionFilter !== undefined) this.activeSectionFilter = parsed.activeSectionFilter;
           if (parsed.showWikitextBox) this.showWikitextBox = parsed.showWikitextBox;
           if (parsed.showTemplateBox) this.showTemplateBox = parsed.showTemplateBox;
           if (parsed.wikitextInput) this.wikitextInput = parsed.wikitextInput;
@@ -2315,7 +2497,7 @@ reviewedCount() {
       this.showResetConfirm = false;
       this.clearArticle();
       this.currentMode = 'article';
-      this.articleViewMode = 'all';
+      this.activeSectionFilter = 'all';
       this.activeSectionIndex = 0;
       this.sectionsList = [];
       this.targetArticleSections = [];
@@ -2408,6 +2590,7 @@ reviewedCount() {
       this.articleExistsTitle = '';
       this.sectionsList = [];
       this.targetArticleSections = [];
+      this.activeSectionFilter = 'all';
       this.activeSectionIndex = 0;
     },
 
@@ -2445,6 +2628,7 @@ reviewedCount() {
     splitIntoParagraphs(wikitext) {
       const partsWithSections = splitWikitextWithSections(wikitext);
       this.sectionsList = extractSectionsFromWikitext(wikitext);
+      this.activeSectionFilter = 'all';
       this.activeSectionIndex = 0;
       this.paragraphs = partsWithSections.map(p => ({
         source: p.source.trim(),
@@ -2683,12 +2867,12 @@ reviewedCount() {
       } else if (this.currentMode === 'template') {
         textToPreview = this.templateTranslated;
         sourceText = this.templateInput;
-      } else if (this.articleViewMode === 'section') {
-        textToPreview = this.activeSectionTranslatedText;
-        sourceText = this.activeSectionParagraphs.map(p => p.source).join('\n\n');
-      } else {
+      } else if (this.activeSectionFilter === 'all') {
         textToPreview = this.fullTranslatedText;
         sourceText = this.rawWikitext || (this.paragraphs.length ? this.paragraphs.map(p => p.source).join('\n\n') : '');
+      } else {
+        textToPreview = this.activeSectionTranslatedText;
+        sourceText = this.activeSectionParagraphs.map(p => p.source).join('\n\n');
       }
 
       if (!textToPreview && !sourceText) {
@@ -2880,14 +3064,12 @@ reviewedCount() {
         this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
         return;
       }
-      const textToCopy = this.articleViewMode === 'section' ? this.activeSectionTranslatedText : this.fullTranslatedText;
-      const isReviewed = this.articleViewMode === 'section'
-        ? (this.currentActiveSection && this.currentActiveSection.reviewedCount === this.currentActiveSection.paragraphCount)
-        : this.isFullyReviewed;
+      const textToCopy = this.activeSectionFilter === 'all' ? this.fullTranslatedText : this.activeSectionTranslatedText;
+      const isReviewed = this.activeSectionFilter === 'all' ? this.isFullyReviewed : this.currentActiveSection?.reviewedCount === this.currentActiveSection?.paragraphCount;
 
       navigator.clipboard.writeText(textToCopy)
         .then(() => {
-          this.trackAnalyticsEvent('copy', { format: this.articleViewMode === 'section' ? 'section_wikitext' : 'full_wikitext' });
+          this.trackAnalyticsEvent('copy', { format: this.activeSectionFilter === 'all' ? 'full_wikitext' : 'section_wikitext' });
           if (!isReviewed) {
             this.showToast('Copied to clipboard! ⚠️ Please proofread unreviewed machine translation before publishing on Wikipedia.', 'warning');
           } else {
@@ -2912,19 +3094,6 @@ reviewedCount() {
         });
     },
 
-    openPublishModal() {
-      if (!this.hasAnyTranslation) {
-        this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
-        return;
-      }
-      if (!this.toLanguage) {
-        this.toLanguageError = true;
-        this.showToast(this.$t('warnings.selectTarget'), 'warning');
-        return;
-      }
-      this.showPublishModal = true;
-    },
-
     handleArticlePublished({ title, url }) {
       this.showToast(`Article "${title}" published successfully!`, 'success');
     },
@@ -2934,20 +3103,16 @@ reviewedCount() {
         this.showToast(this.$t('warnings.emptyTranslation'), 'warning');
         return;
       }
-      const textToExport = this.articleViewMode === 'section' ? this.activeSectionTranslatedText : this.fullTranslatedText;
-      const isReviewed = this.articleViewMode === 'section'
-        ? (this.currentActiveSection && this.currentActiveSection.reviewedCount === this.currentActiveSection.paragraphCount)
-        : this.isFullyReviewed;
+      const textToExport = this.activeSectionFilter === 'all' ? this.fullTranslatedText : this.activeSectionTranslatedText;
+      const isReviewed = this.activeSectionFilter === 'all' ? this.isFullyReviewed : this.currentActiveSection?.reviewedCount === this.currentActiveSection?.paragraphCount;
 
-      this.trackAnalyticsEvent('export', { format: this.articleViewMode === 'section' ? 'section_wiki_file' : 'wiki_file' });
+      this.trackAnalyticsEvent('export', { format: 'wiki_file' });
       const blob = new Blob([textToExport], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const sectionPart = this.articleViewMode === 'section' && this.currentActiveSection?.title 
-        ? `_${this.currentActiveSection.title.replace(/\s+/g, '_')}`
-        : '';
-      a.download = `${this.articleInput || 'translated'}${sectionPart}_${this.toLanguage}.wiki`;
+      const suffix = this.activeSectionFilter === 'all' ? '' : `_section_${this.activeSectionFilter}`;
+      a.download = `${this.articleInput || 'translated'}${suffix}_${this.toLanguage}.wiki`;
       a.click();
       URL.revokeObjectURL(url);
       if (!isReviewed) {
