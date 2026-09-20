@@ -126,6 +126,7 @@ const messages = {
       targetPreview: 'Target Preview',
       originalWikitext: 'Original Wikitext',
       translatedWikitext: 'Translated Wikitext',
+      loginAndPublish: 'Login and Publish',
     },
     warnings: {
       enterArticle: 'Please enter an article name.',
@@ -267,6 +268,7 @@ const messages = {
       targetPreview: 'Aperçu cible',
       originalWikitext: 'Wikitexte original',
       translatedWikitext: 'Wikitexte traduit',
+      loginAndPublish: 'Se connecter et publier',
     },
     warnings: {
       enterArticle: 'Veuillez saisir un nom d\'article.',
@@ -408,6 +410,7 @@ const messages = {
       targetPreview: 'Vista previa de destino',
       originalWikitext: 'Wikitexto original',
       translatedWikitext: 'Wikitexto traducido',
+      loginAndPublish: 'Iniciar sesión y publicar',
     },
     warnings: {
       enterArticle: 'Por favor, introduce un nombre de artículo.',
@@ -517,6 +520,7 @@ const messages = {
       targetPreview: 'Pré-visualização de destino',
       originalWikitext: 'Wikitexto original',
       translatedWikitext: 'Wikitexto traduzido',
+      loginAndPublish: 'Entrar e publicar',
     },
     warnings: {
       enterArticle: 'Por favor, insira o nome de um artigo.',
@@ -626,6 +630,7 @@ const messages = {
       targetPreview: 'Anteprima di destinazione',
       originalWikitext: 'Wikitesto originale',
       translatedWikitext: 'Wikitesto tradotto',
+      loginAndPublish: 'Accedi e pubblica',
     },
     warnings: {
       enterArticle: 'Inserisci il nome di una voce.',
@@ -735,6 +740,7 @@ const messages = {
       targetPreview: 'Zielvorschau',
       originalWikitext: 'Original-Wikitext',
       translatedWikitext: 'Übersetzter Wikitext',
+      loginAndPublish: 'Anmelden und veröffentlichen',
     },
     warnings: {
       enterArticle: 'Bitte geben Sie einen Artikelnamen ein.',
@@ -844,6 +850,7 @@ const messages = {
       targetPreview: 'ᱴᱟᱨᱜᱮᱴ ᱧᱮᱞ ᱵᱤᱰᱟᱹᱣ',
       originalWikitext: 'ᱢᱩᱬ ᱣᱤᱠᱤᱴᱮᱠᱥᱴ',
       translatedWikitext: 'ᱛᱚᱨᱡᱚᱢᱟ ᱣᱤᱠᱤᱴᱮᱠᱥᱴ',
+      loginAndPublish: 'ᱞᱚᱜᱤᱱ ᱟᱨ ᱩᱪᱷᱟᱹᱱ',
     },
     warnings: {
       enterArticle: 'ᱫᱟᱭᱟᱠᱟᱛᱮ ᱚᱱᱚᱞ ᱧᱩᱛᱩᱢ ᱮᱢ ᱢᱮ᱾',
@@ -988,6 +995,7 @@ const messages = {
       targetPreview: 'ଲକ୍ଷ୍ୟ ଆଗୁଆ ଦେଖଣା',
       originalWikitext: 'ମୂଳ ୱିକିଟେକ୍ସଟ',
       translatedWikitext: 'ଅନୁବାଦିତ ୱିକିଟେକ୍ସଟ',
+      loginAndPublish: 'ଲଗଇନ କରି ପ୍ରକାଶ କରନ୍ତୁ',
     },
     warnings: {
       enterArticle: 'ଦୟାକରି ଏକ ଲେଖା ନାମ ଲେଖନ୍ତୁ।',
@@ -1129,6 +1137,7 @@ const messages = {
       targetPreview: 'अनुवादित पूर्वावलोकन',
       originalWikitext: 'मूल विकिटेक्स्ट',
       translatedWikitext: 'अनुवादित विकिटेक्स्ट',
+      loginAndPublish: 'लॉगिन करें और प्रकाशित करें',
     },
     warnings: {
       enterArticle: 'कृपया एक लेख का नाम दर्ज करें।',
@@ -1238,6 +1247,7 @@ const messages = {
       targetPreview: 'ਨਿਸ਼ਾਨਾ ਪੂਰਵਦਰਸ਼ਨ',
       originalWikitext: 'ਮੂਲ ਵਿਕੀਟੈਕਸਟ',
       translatedWikitext: 'ਅਨੁਵਾਦਿਤ ਵਿਕੀਟੈਕਸਟ',
+      loginAndPublish: 'ਲੌਗਇਨ ਕਰੋ ਅਤੇ ਪ੍ਰਕਾਸ਼ਿਤ ਕਰੋ',
     },
     warnings: {
       enterArticle: 'ਕਿਰਪਾ ਕਰਕੇ ਲੇਖ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।',
@@ -1347,6 +1357,7 @@ const messages = {
       targetPreview: 'অনূদিত প্রাকদর্শন',
       originalWikitext: 'মূল উইকিটেক্সট',
       translatedWikitext: 'অনূদিত উইকিটেক্সট',
+      loginAndPublish: 'লগইন করুন এবং প্রকাশ করুন',
     },
     warnings: {
       enterArticle: 'অনুগ্রহ করে নিবন্ধের নাম দিন।',
@@ -1456,6 +1467,7 @@ const messages = {
       targetPreview: 'இலக்கு முன்னோட்டம்',
       originalWikitext: 'மூல விக்கிஉரை',
       translatedWikitext: 'மொழிபெயர்க்கப்பட்ட விக்கிஉரை',
+      loginAndPublish: 'உள்நுழைந்து வெளியிடு',
     },
     warnings: {
       enterArticle: 'தயவுசெய்து ஒரு கட்டுரை பெயரை உள்ளிடவும்.',
@@ -1565,6 +1577,7 @@ const messages = {
       targetPreview: 'లక్ష్య మునుజూపు',
       originalWikitext: 'మూల వికీపాఠ్యం',
       translatedWikitext: 'అనువదించిన వికీపాఠ్యం',
+      loginAndPublish: 'లాగిన్ అయి ప్రచురించండి',
     },
     warnings: {
       enterArticle: 'దయచేసి వ్యాసం పేరు నమోదు చేయండి.',
@@ -1672,6 +1685,7 @@ const messages = {
       targetPreview: 'लक्ष्य पूर्वावलोकन',
       originalWikitext: 'मूळ विकिमजकूर',
       translatedWikitext: 'भाषांतरित विकिमजकूर',
+      loginAndPublish: 'लॉगिन करा आणि प्रकाशित करा',
     },
     warnings: {
       enterArticle: 'कृपया लेखाचे नाव टाका.',
@@ -1781,6 +1795,7 @@ const messages = {
       targetPreview: 'લક્ષ્ય પૂર્વાવલોકન',
       originalWikitext: 'મૂળ વિકિટેક્સ્ટ',
       translatedWikitext: 'અનુવાદિત વિકિટેક્સ્ટ',
+      loginAndPublish: 'લૉગિન કરો અને પ્રકાશિત કરો',
     },
     warnings: {
       enterArticle: 'કૃપા કરીને લેખનું નામ દાખલ કરો.',
@@ -1890,6 +1905,7 @@ const messages = {
       targetPreview: 'ಗುರಿ ಮುನ್ನೋಟ',
       originalWikitext: 'ಮೂಲ ವಿಕಿಪಠ್ಯ',
       translatedWikitext: 'ಅನುವಾದಿತ ವಿಕಿಪಠ್ಯ',
+      loginAndPublish: 'ಲಾಗಿನ್ ಮಾಡಿ ಮತ್ತು ಪ್ರಕಟಿಸಿ',
     },
     warnings: {
       enterArticle: 'ದಯವಿಟ್ಟು ಲೇಖನದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ.',
@@ -1999,6 +2015,7 @@ const messages = {
       targetPreview: 'ലക്ഷ്യ പ്രിവ്യൂ',
       originalWikitext: 'യഥാർത്ഥ വിക്കിടെക്സ്റ്റ്',
       translatedWikitext: 'വിവർത്തനം ചെയ്ത വിക്കിടെക്സ്റ്റ്',
+      loginAndPublish: 'ലോഗിൻ ചെയ്ത് പ്രസിദ്ധീകരിക്കുക',
     },
     warnings: {
       enterArticle: 'ദയവായി ലേഖന നാമം നൽകുക.',
@@ -2108,6 +2125,7 @@ const messages = {
       targetPreview: '译文预览',
       originalWikitext: '原始Wikitext',
       translatedWikitext: '翻译后Wikitext',
+      loginAndPublish: '登录并发布',
     },
     warnings: {
       enterArticle: '请输入条目名称。',
@@ -2217,6 +2235,7 @@ const messages = {
       targetPreview: '訳文プレビュー',
       originalWikitext: '原文ウィキテキスト',
       translatedWikitext: '翻訳ウィキテキスト',
+      loginAndPublish: 'ログインして投稿',
     },
     warnings: {
       enterArticle: '記事名を入力してください。',
@@ -2326,6 +2345,7 @@ const messages = {
       targetPreview: 'معاينة الهدف',
       originalWikitext: 'نص الويكي الأصلي',
       translatedWikitext: 'نص الويكي المترجم',
+      loginAndPublish: 'تسجيل الدخول والنشر',
     },
     warnings: {
       enterArticle: 'يرجى إدخال اسم المقالة.',

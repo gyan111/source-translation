@@ -17,6 +17,7 @@ describe('Preview i18n keys', () => {
     'targetPreview',
     'originalWikitext',
     'translatedWikitext',
+    'loginAndPublish',
   ];
 
   const messagesObj = i18n.global.messages.value || i18n.global.messages;

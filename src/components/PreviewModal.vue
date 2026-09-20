@@ -79,7 +79,7 @@
                 title="Login to your Wikipedia account to publish"
               >
                 <span class="material-icons-round text-sm">lock</span>
-                <span>{{ $t('header.login') || 'Login to Publish' }}</span>
+                <span>{{ $t('preview.loginAndPublish') || 'Login and Publish' }}</span>
               </a>
               <button @click="closePreview" class="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors">
                 <span class="material-icons-round text-lg">close</span>
