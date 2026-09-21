@@ -121,22 +121,18 @@
               </div>
             </div>
 
-            <!-- Mainspace Review Confirmation Checkbox (Anti-Spam / Anti-Vandalism) -->
-            <div v-if="selectedDest === 'mainspace' && !isFullyReviewed">
-              <label class="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 cursor-pointer select-none">
+            <!-- Mainspace Review Confirmation Checkbox (Mandatory Quality Standards & Review by Me) -->
+            <div v-if="selectedDest === 'mainspace'">
+              <label class="flex items-start gap-2.5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   v-model="userAcknowledgedReview"
                   class="mt-0.5 rounded border-amber-400 text-primary-600 focus:ring-primary-500"
                 />
-                <span>I have read the translated text and confirm it meets Wikipedia's encyclopedic quality standards.</span>
+                <span class="leading-relaxed">
+                  <strong>Quality & Review Confirmation:</strong> I confirm that I have personally reviewed this translation, verified its accuracy, and confirm it adheres to Wikipedia's encyclopedic quality standards and neutral point of view.
+                </span>
               </label>
-            </div>
-
-            <!-- Mainspace Guideline Alert -->
-            <div v-else-if="selectedDest === 'mainspace'" class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[11px] flex items-start gap-2">
-              <span class="material-icons-round text-sm mt-0.5">verified</span>
-              <span>All sections have been human-reviewed! Your article is ready for live publishing on Wikipedia.</span>
             </div>
 
             <!-- Action Buttons -->
@@ -191,9 +187,15 @@
 
               <!-- Page Existence Status Indicator -->
               <div v-if="targetTitle.trim()" class="mt-2 text-[11px]">
-                <div v-if="pageExists === true" class="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                  <span class="material-icons-round text-xs">warning</span>
-                  <span>Page already exists on {{ toLanguage }}.wikipedia.org (Publishing will update/edit it).</span>
+                <div v-if="pageExists === true" class="space-y-1.5">
+                  <div class="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                    <span class="material-icons-round text-xs">warning</span>
+                    <span>Page already exists on {{ toLanguage }}.wikipedia.org (Publishing will update/edit it).</span>
+                  </div>
+                  <div v-if="publishMode === 'full'" class="flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 p-2 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <span class="material-icons-round text-xs shrink-0 mt-0.5">report_problem</span>
+                    <span>Warning: Full article publishing will replace the entire existing page on Wikipedia. If you only want to add or update a specific section, close this modal and use "Publish This Section" instead.</span>
+                  </div>
                 </div>
                 <div v-else-if="pageExists === false" class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                   <span class="material-icons-round text-xs">check_circle</span>
@@ -384,9 +386,16 @@
                       <div class="font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
                         <span>Mainspace (Live Article)</span>
                         <span
-                          v-if="canPublishMainspace"
+                          v-if="user?.canPublishMainspace === true"
                           class="text-[10px] px-1.5 py-0.2 rounded bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-semibold"
                         >Direct</span>
+                        <span
+                          v-else-if="isSectionMainspaceAllowed"
+                          class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-0.5"
+                        >
+                          <span class="material-icons-round text-[10px]">add_circle</span>
+                          Expand Live Article
+                        </span>
                         <span
                           v-else
                           class="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-0.5"
@@ -397,6 +406,9 @@
                       </div>
                       <p v-if="canPublishMainspace" class="text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
                         {{ toLanguage }}.wikipedia.org/wiki/{{ encodeURIComponent(targetTitle.trim() || 'Title') }}
+                      </p>
+                      <p v-else-if="publishMode === 'section' && pageExists === false" class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                        Article does not exist yet on target Wikipedia. Creating new articles directly in Mainspace is restricted to verified users during Phase 1. Please use Sandbox or Draft below.
                       </p>
                       <p v-else class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
                         Currently only available to verified users. Please use Sandbox or Draft below.
@@ -571,7 +583,12 @@ export default {
   },
   computed: {
     canPublishMainspace() {
-      return this.user?.canPublishMainspace === true;
+      if (this.user?.canPublishMainspace === true) return true;
+      if (this.publishMode === 'section' && this.pageExists === true) return true;
+      return false;
+    },
+    isSectionMainspaceAllowed() {
+      return this.publishMode === 'section' && this.pageExists === true;
     },
     availableTargetSections() {
       if (this.localTargetArticleSections && this.localTargetArticleSections.length > 0) {
@@ -780,10 +797,14 @@ export default {
     },
 
     showMainspaceRestrictedInfo() {
-      this.errorMessage = 'Direct Mainspace publishing is currently restricted to verified users during Phase 1 beta. Please choose User Sandbox (Draft) or Draft namespace below.';
+      if (this.publishMode === 'section' && this.pageExists === false) {
+        this.errorMessage = 'This article does not exist yet on target Wikipedia. Creating brand new articles directly in Mainspace is restricted to verified users during Phase 1 beta. Please choose User Sandbox (Draft) or Draft namespace below.';
+      } else {
+        this.errorMessage = 'Direct Mainspace publishing is currently restricted to verified users during Phase 1 beta. Please choose User Sandbox (Draft) or Draft namespace below.';
+      }
     },
 
-    promptPublishConfirmation(dest) {
+    async promptPublishConfirmation(dest) {
       const rawTitle = this.targetTitle.trim();
       if (!rawTitle) {
         this.errorMessage = 'Please enter an article title';
@@ -792,6 +813,12 @@ export default {
       this.selectedDest = dest;
       this.confirmingPublish = true;
       this.errorMessage = '';
+
+      // Check page existence for the destination page (e.g. User:username/title)
+      const targetDestinationTitle = this.finalFormattedTitle;
+      if (targetDestinationTitle && targetDestinationTitle !== this.targetTitle.trim()) {
+        await this.checkPageExistence(targetDestinationTitle);
+      }
     },
 
     async performFinalPublish() {
@@ -813,9 +840,13 @@ export default {
           sourceLanguage: this.fromLanguage,
           sourceTitle: this.sourceTitle,
           mtEngine: this.mtEngine || 'google',
+          userAcknowledgedReview: Boolean(this.userAcknowledgedReview),
         };
 
         if (this.publishMode === 'section') {
+          payload.publishMode = 'section';
+          payload.placementMode = this.sectionPlacement;
+
           if (this.pageExists === false) {
             let textToPublish = this.fullTranslatedText;
             const heading = (this.localSectionTitle && this.localSectionTitle.trim()) || this.sectionTitle;
@@ -823,9 +854,11 @@ export default {
               textToPublish = `== ${heading.trim()} ==\n\n` + textToPublish.trim();
             }
             payload.text = textToPublish;
+            payload.section = 'new';
+            if (heading) {
+              payload.sectiontitle = heading.trim();
+            }
           } else {
-            payload.publishMode = 'section';
-            payload.placementMode = this.sectionPlacement;
             if (this.sectionPlacement === 'append_bottom') {
               payload.section = 'new';
             } else if (this.sectionPlacement === 'insert_after') {

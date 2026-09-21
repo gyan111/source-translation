@@ -29,6 +29,7 @@ router.post('/', async (req, res) => {
     placementMode,
     targetSectionIndex,
     targetSectionTitle,
+    userAcknowledgedReview,
   } = req.body;
 
   if (!text || !language || !title) {
@@ -41,11 +42,46 @@ router.post('/', async (req, res) => {
   // Phase 1 Guard: Check if publishing to Mainspace and verify user
   const isMainspace = !title.startsWith('User:') && !title.startsWith('Draft:');
   const username = req.session.user.username;
-  if (isMainspace && !isVerifiedUser(username)) {
-    return res.status(403).json({
-      error: 'Mainspace Restricted',
-      message: 'Direct Mainspace publishing is currently restricted to verified users during Phase 1 beta. Please publish to your User Sandbox (Draft) or Draft namespace.',
-    });
+  const verified = isVerifiedUser(username);
+
+  if (isMainspace && !verified) {
+    const isSectionPublish = publishMode === 'section' || (section !== undefined && section !== null && section !== '') || Boolean(sectiontitle);
+
+    if (isSectionPublish) {
+      if (!userAcknowledgedReview) {
+        return res.status(400).json({
+          error: 'Review Confirmation Required',
+          message: 'Please review the translation and confirm it meets Wikipedia quality standards before publishing to Mainspace.',
+        });
+      }
+
+      // Check if target page exists on Wikipedia
+      const userAgent = 'SourceTranslationTool/2.0 (https://meta.wikimedia.org/wiki/User:Jnanaranjan_sahu; source-translation-app)';
+      const pageCheckUrl = `https://${language}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&format=json`;
+      const pageCheckRes = await fetch(pageCheckUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'User-Agent': userAgent,
+        },
+      });
+      const pageCheckData = await pageCheckRes.json();
+      const pages = pageCheckData?.query?.pages || {};
+      const pageId = Object.keys(pages)[0];
+      const pageExists = pageId && pageId !== '-1' && !pages[pageId].missing;
+
+      if (!pageExists) {
+        return res.status(403).json({
+          error: 'Mainspace Creation Restricted',
+          message: 'Direct Mainspace creation of new articles is currently restricted to verified users during Phase 1 beta. Please publish to your User Sandbox (Draft) or Draft namespace.',
+        });
+      }
+      // Target page exists and user confirmed review: section publish to Mainspace allowed!
+    } else {
+      return res.status(403).json({
+        error: 'Mainspace Restricted',
+        message: 'Direct Mainspace article publishing is currently restricted to verified users during Phase 1 beta. Please publish to your User Sandbox (Draft) or Draft namespace.',
+      });
+    }
   }
 
   try {
@@ -160,6 +196,10 @@ router.post('/', async (req, res) => {
           throw new Error(`Failed to locate target section on "${title}": ${parseData.error.info || 'Section not found'}`);
         }
         const existingAnchorText = parseData.parse?.wikitext?.['*'] ?? '';
+
+        if (anchorIndex !== '0' && !existingAnchorText.trim()) {
+          throw new Error(`Failed to safely retrieve anchor section wikitext from "${title}". Please use "Append at bottom" to prevent data loss.`);
+        }
 
         let sectionWikitext = text.trim();
         if (sectiontitle && !sectionWikitext.startsWith('=')) {

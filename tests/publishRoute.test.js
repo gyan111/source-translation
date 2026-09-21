@@ -520,4 +520,133 @@ describe('Publish Route (/publish)', () => {
     expect(bodyParams.get('text')).toBe('List of publications.');
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
+
+  it('allows unverified users to publish sections directly to existing Mainspace articles when review is confirmed', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'UnverifiedUser123',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: 'New section content',
+        language: 'en',
+        title: 'Physics',
+        publishMode: 'section',
+        placementMode: 'append_bottom',
+        sectiontitle: 'Discoveries',
+        userAcknowledgedReview: true,
+      },
+    });
+
+    // 1. Mock page existence check returning page exists
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: {
+          pages: {
+            '100': { pageid: 100, title: 'Physics' },
+          },
+        },
+      }),
+    });
+
+    // 2. Mock CSRF token
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: { tokens: { csrftoken: 'valid-csrf-token+\\' } },
+      }),
+    });
+
+    // 3. Mock Edit response
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        edit: { result: 'Success', pageid: 100, title: 'Physics', newrevid: 100006 },
+      }),
+    });
+
+    await invokeRouter(req, res);
+
+    expect(res.status).not.toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it('rejects unverified users trying to publish sections to Mainspace without userAcknowledgedReview', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'UnverifiedUser123',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: 'New section content',
+        language: 'en',
+        title: 'Physics',
+        publishMode: 'section',
+        placementMode: 'append_bottom',
+        sectiontitle: 'Discoveries',
+        userAcknowledgedReview: false,
+      },
+    });
+
+    await invokeRouter(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Review Confirmation Required' }));
+  });
+
+  it('rejects unverified users trying to publish sections to non-existent Mainspace articles', async () => {
+    vi.mocked(oauthService.validateOrRefreshToken).mockResolvedValueOnce('valid-token');
+
+    const mockSession = {
+      user: {
+        username: 'UnverifiedUser123',
+        accessToken: 'valid-token',
+        expiresAt: Date.now() + 3600 * 1000,
+      },
+      save: vi.fn((cb) => cb && cb()),
+    };
+
+    const { req, res } = createMockReqRes({
+      session: mockSession,
+      body: {
+        text: 'New section content',
+        language: 'en',
+        title: 'Brand_New_Article_12345',
+        publishMode: 'section',
+        placementMode: 'append_bottom',
+        sectiontitle: 'Intro',
+        userAcknowledgedReview: true,
+      },
+    });
+
+    // Mock page check returning missing page
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        query: {
+          pages: {
+            '-1': { missing: '' },
+          },
+        },
+      }),
+    });
+
+    await invokeRouter(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Mainspace Creation Restricted' }));
+  });
 });

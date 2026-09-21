@@ -76,7 +76,7 @@ describe('PublishModal Section Placement & Page Existence Logic', () => {
     expect(PublishModal.computed.placementPreviewText.call(existingPageVm)).toBe('Will be appended at the end of the article');
   });
 
-  it('publishes as new page with prepended heading when pageExists is false in section mode', async () => {
+  it('publishes as new page with prepended heading and preserves section mode when pageExists is false in section mode', async () => {
     let capturedPayload = null;
     vi.mocked(axios.post).mockImplementationOnce((url, payload) => {
       capturedPayload = payload;
@@ -97,6 +97,7 @@ describe('PublishModal Section Placement & Page Existence Logic', () => {
       isPublishing: false,
       publishingDest: null,
       selectedDest: 'mainspace',
+      userAcknowledgedReview: true,
       errorMessage: '',
       publishSuccess: false,
       confirmingPublish: true,
@@ -110,10 +111,42 @@ describe('PublishModal Section Placement & Page Existence Logic', () => {
     expect(capturedPayload.title).toBe('A Single Shot');
     expect(capturedPayload.text).toContain('== ପୃଷ୍ଠଭୂମି ==');
     expect(capturedPayload.text).toContain('Translated paragraph content.');
-    // Should NOT have section: 'new' or placementMode
-    expect(capturedPayload.publishMode).toBeUndefined();
-    expect(capturedPayload.placementMode).toBeUndefined();
+    expect(capturedPayload.publishMode).toBe('section');
+    expect(capturedPayload.section).toBe('new');
+    expect(capturedPayload.sectiontitle).toBe('ପୃଷ୍ଠଭୂମି');
+    expect(capturedPayload.userAcknowledgedReview).toBe(true);
     expect(vm.publishSuccess).toBe(true);
+  });
+
+  it('allows mainspace publishing for section mode on existing articles (Option A)', () => {
+    const unverifiedExistingSectionVm = {
+      user: { canPublishMainspace: false },
+      publishMode: 'section',
+      pageExists: true,
+    };
+    expect(PublishModal.computed.canPublishMainspace.call(unverifiedExistingSectionVm)).toBe(true);
+    expect(PublishModal.computed.isSectionMainspaceAllowed.call(unverifiedExistingSectionVm)).toBe(true);
+
+    const unverifiedNewSectionVm = {
+      user: { canPublishMainspace: false },
+      publishMode: 'section',
+      pageExists: false,
+    };
+    expect(PublishModal.computed.canPublishMainspace.call(unverifiedNewSectionVm)).toBe(false);
+
+    const unverifiedFullVm = {
+      user: { canPublishMainspace: false },
+      publishMode: 'full',
+      pageExists: true,
+    };
+    expect(PublishModal.computed.canPublishMainspace.call(unverifiedFullVm)).toBe(false);
+
+    const verifiedVm = {
+      user: { canPublishMainspace: true },
+      publishMode: 'full',
+      pageExists: false,
+    };
+    expect(PublishModal.computed.canPublishMainspace.call(verifiedVm)).toBe(true);
   });
 });
 
