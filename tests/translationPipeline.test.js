@@ -157,6 +157,37 @@ describe('translationPipeline', () => {
     expect(translatedTemplate).toContain('| area_code = 91-6727');
     expect(stats.errors).toEqual([]);
   });
+
+  it('preserves citations inside <ref> tags verbatim without translating bibliographic content', async () => {
+    // Mock translation service for LLM (gemini)
+    axios.post.mockImplementation(async (url, data) => {
+      // Return translated text simulating LLM
+      return {
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: 'ᱵᱚᱫᱽᱨᱤᱱᱟᱛᱷ ᱫᱚ ᱢᱤᱫ ᱪᱚᱞᱚᱛᱪᱤᱛᱟᱹᱨ ᱠᱟᱱᱟ᱾<ref class="notranslate" data-ref-id="0"/>',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      };
+    });
+
+    const wikitext = 'Badrenath is a film.<ref>{{Cite web |title=Badrenath (Original Motion Picture Soundtrack) |url=https://music.apple.com/us/album/badrenath-original-motion-picture-soundtrack/925480747 |website=[[Apple Music]]}}</ref>';
+    const { translatedText } = await translateWikitext(wikitext, 'en', 'sat', 'gemini', { apiKey: 'fake-key' });
+
+    expect(translatedText).toBeDefined();
+    // Verify citation inside ref tag is completely verbatim
+    expect(translatedText).toContain('<ref>{{Cite web |title=Badrenath (Original Motion Picture Soundtrack) |url=https://music.apple.com/us/album/badrenath-original-motion-picture-soundtrack/925480747 |website=[[Apple Music]]}}</ref>');
+    // Verify Apple Music was not translated inside the citation
+    expect(translatedText).not.toContain('ᱮᱯᱚᱞ ᱢᱤᱣᱡᱤᱠ');
+  });
 });
 
 

@@ -565,6 +565,8 @@ export function buildLlmSystemInstruction(fromLang, toLang, options = {}) {
   prompt += `IMPORTANT RULES:\n`;
   prompt += `- Translate naturally into fluent, grammatically correct ${toSpec.name}.\n`;
   prompt += `- Preserve ALL wiki formatting: bold ('''), italic (''), headings (==), lists (*, #), template calls ({{...}}), and citations (<ref>...</ref>) exactly in place.\n`;
+  prompt += `- Citations (<ref>...</ref>) are protected with placeholder tags like <ref class="notranslate" data-ref-id="0"/>. Keep these <ref .../> tags EXACTLY as they are in place without translating, modifying, or removing them.\n`;
+  prompt += `- Do NOT translate, alter, or invent anything inside citation tags or placeholders.\n`;
   prompt += `- For [[wikilinks]]:\n`;
   prompt += `  * ALL article titles, link targets, and link display texts MUST be fully localized into ${toDesc}.\n`;
   if (toSpec.script) {

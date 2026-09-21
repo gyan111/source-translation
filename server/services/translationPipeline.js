@@ -22,6 +22,8 @@ import {
   reassembleTemplate,
   isTranslatableParamValue,
   normalizeWikitextSyntax,
+  protectRefTags,
+  restoreRefTags,
 } from './wikitextParser.js';
 import {
   translateTitlesViaWikidata,
@@ -128,8 +130,11 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
     if (onProgress) onProgress('text', 60);
     stepStart = Date.now();
 
+    // Protect all <ref>...</ref> tags before sitelink/template substitution and LLM translation
+    const { protectedText, refTags } = protectRefTags(wikitext);
+
     // Pre-substitute exact Wikidata sitelinks if available on target wiki
-    let preparedWikitext = wikitext;
+    let preparedWikitext = protectedText;
     for (const [orig, translated] of Object.entries(translatedLinks)) {
       if (translated && translated !== orig) {
         const escaped = orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -149,12 +154,15 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
 
     try {
       const translatedWikitext = await translateText(preparedWikitext, fromLang, toLang, service, options);
+      // Restore original <ref> tags verbatim
+      const withRefsRestored = restoreRefTags(translatedWikitext, refTags);
+
       stats.timingMs.textTranslation = Date.now() - stepStart;
       stats.timingMs.total = Date.now() - startTime;
       if (onProgress) onProgress('done', 100);
 
-      const normalizedWikitext = normalizeWikitextSyntax(translatedWikitext);
-      console.log(`[Pipeline/LLM] Completed in ${stats.timingMs.total}ms — links: ${stats.linksTranslated}/${stats.linksFound}, templates: ${stats.templatesTranslated}/${stats.templatesFound}`);
+      const normalizedWikitext = normalizeWikitextSyntax(withRefsRestored);
+      console.log(`[Pipeline/LLM] Completed in ${stats.timingMs.total}ms — links: ${stats.linksTranslated}/${stats.linksFound}, templates: ${stats.templatesTranslated}/${stats.templatesFound}, refs protected: ${refTags.length}`);
       return { translatedText: normalizedWikitext, stats };
     } catch (llmErr) {
       console.warn(`[Pipeline/LLM] Direct LLM translation failed: ${llmErr.message}. Falling back to segmented pipeline.`);
@@ -385,7 +393,7 @@ export async function translateTemplate(templateWikitext, fromLang, toLang, serv
     if (p.isComment) continue;
     const val = p.value.trim();
     if (isTranslatableParamValue(val, p.name)) {
-      translatableParams.push({ param: p, text: val, hasWikilinks: val.includes('[[') || val.includes('{{') });
+      translatableParams.push({ param: p, text: val, hasWikilinks: val.includes('[[') || val.includes('{{') || /<ref/i.test(val) });
     }
   }
 

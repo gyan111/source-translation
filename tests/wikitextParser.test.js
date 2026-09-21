@@ -12,6 +12,8 @@ import {
   isTranslatableParamValue,
   parseFileLink,
   resolveOrphanReferences,
+  protectRefTags,
+  restoreRefTags,
 } from '../server/services/wikitextParser.js';
 import { normalizeToAsciiDigits } from '../server/services/numeralConverter.js';
 
@@ -61,6 +63,56 @@ describe('wikitextParser', () => {
       const refSegs = segments.filter(s => s.type === 'ref');
       expect(refSegs).toHaveLength(1);
       expect(refSegs[0].content).toBe('<ref name="speed">Speed of light is 300,000 km/s</ref>');
+    });
+  });
+
+  describe('protectRefTags and restoreRefTags', () => {
+    it('protects and restores references with templates, wikilinks, and URLs verbatim', () => {
+      const source = `Badrenath is a film.<ref>{{Cite web |title=Badrenath (Original Motion Picture Soundtrack) |url=https://music.apple.com/us/album/badrenath-original-motion-picture-soundtrack/925480747 |url-status=live |archive-url=https://web.archive.org/web/20200412135047/https://music.apple.com/us/album/badrenath-original-motion-picture-soundtrack/925480747 |archive-date=12 April 2020 |access-date=12 April 2020 |website=[[Apple Music]]}}</ref> It was a hit.<ref name="boxoffice" />`;
+
+      const { protectedText, refTags } = protectRefTags(source);
+      expect(refTags).toHaveLength(2);
+      expect(protectedText).toContain('<ref class="notranslate" data-ref-id="0"/>');
+      expect(protectedText).toContain('<ref class="notranslate" data-ref-id="1"/>');
+      expect(protectedText).not.toContain('Apple Music');
+      expect(protectedText).not.toContain('https://music.apple.com');
+
+      // Simulate LLM translating the surrounding prose while keeping or slightly adjusting the ref tags
+      const simulatedLlmOutput = `ᱵᱚᱫᱽᱨᱤᱱᱟᱛᱷ ᱫᱚ ᱢᱤᱫ ᱪᱚᱞᱚᱛᱪᱤᱛᱟᱹᱨ ᱠᱟᱱᱟ᱾<ref class="notranslate" data-ref-id="0"/> ᱱᱚᱣᱟ ᱫᱚ ᱦᱤᱴ ᱞᱮᱱᱟ᱾<ref class="notranslate" data-ref-id="1" />`;
+
+      const restored = restoreRefTags(simulatedLlmOutput, refTags);
+      expect(restored).toContain('<ref>{{Cite web |title=Badrenath (Original Motion Picture Soundtrack) |url=https://music.apple.com/us/album/badrenath-original-motion-picture-soundtrack/925480747 |url-status=live |archive-url=https://web.archive.org/web/20200412135047/https://music.apple.com/us/album/badrenath-original-motion-picture-soundtrack/925480747 |archive-date=12 April 2020 |access-date=12 April 2020 |website=[[Apple Music]]}}</ref>');
+      expect(restored).toContain('<ref name="boxoffice" />');
+    });
+
+    it('handles LLMs outputting closing tags or slight attribute variations', () => {
+      const source = `Born in 1990.<ref>{{cite news |title=Birth record |author=John Doe}}</ref>`;
+      const { protectedText, refTags } = protectRefTags(source);
+
+      const llmVariations = [
+        '1990 ᱨᱮ ᱡᱟᱱᱟᱢ ᱞᱮᱱᱟ᱾<ref data-ref-id="0"></ref>',
+        '1990 ᱨᱮ ᱡᱟᱱᱟᱢ ᱞᱮᱱᱟ᱾<ref data-ref-id=\'0\'/>',
+        '1990 ᱨᱮ ᱡᱟᱱᱟᱢ ᱞᱮᱱᱟ᱾<ref data-ref-id=0 />',
+        '1990 ᱨᱮ ᱡᱟᱱᱟᱢ ᱞᱮᱱᱟ᱾<ref data-ref-id="0">some translated text</ref>',
+      ];
+
+      for (const variation of llmVariations) {
+        const restored = restoreRefTags(variation, refTags);
+        expect(restored).toContain('<ref>{{cite news |title=Birth record |author=John Doe}}</ref>');
+        expect(restored).not.toContain('data-ref-id');
+      }
+    });
+
+    it('safely re-attaches references if an engine drops them', () => {
+      const source = `Some claim.<ref name="c1">Proof 1</ref> Another claim.<ref name="c2">Proof 2</ref>\n\n{{Reflist}}`;
+      const { protectedText, refTags } = protectRefTags(source);
+
+      // Suppose the model completely dropped ref 1 and only kept ref 0
+      const droppedOutput = `Some claim.<ref class="notranslate" data-ref-id="0"/> Another claim.\n\n{{Reflist}}`;
+      const restored = restoreRefTags(droppedOutput, refTags);
+
+      expect(restored).toContain('<ref name="c1">Proof 1</ref>');
+      expect(restored).toContain('<ref name="c2">Proof 2</ref>');
     });
   });
 

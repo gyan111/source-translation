@@ -546,7 +546,7 @@ export function extractTemplateParamTexts(segments) {
             paramIndex: paramIdx,
             paramName: param.name,
             text: val,
-            hasWikilinks: val.includes('[[') || val.includes('{{'),
+            hasWikilinks: val.includes('[[') || val.includes('{{') || /<ref/i.test(val),
           });
         }
       });
@@ -663,6 +663,74 @@ export function normalizeWikitextSyntax(wikitext) {
   result = result.replace(/\n{3,}/g, '\n\n');
 
   return result.trim();
+}
+
+/**
+ * Protect all <ref>...</ref> and <ref ... /> tags with non-translatable placeholders.
+ * Returns { protectedText, refTags: [{ placeholder, original }] }
+ */
+export function protectRefTags(wikitext) {
+  if (!wikitext || typeof wikitext !== 'string') {
+    return { protectedText: wikitext, refTags: [] };
+  }
+
+  const refTags = [];
+  const protectedText = wikitext.replace(REF_RE, (match) => {
+    const id = refTags.length;
+    const placeholder = `<ref class="notranslate" data-ref-id="${id}"/>`;
+    refTags.push({ placeholder, original: match });
+    return placeholder;
+  });
+
+  return { protectedText, refTags };
+}
+
+/**
+ * Restores protected <ref> tags back into their original locations.
+ * Robust against LLM output variations (whitespace, self-closing vs closing tag, dropped attributes).
+ * Also ensures any completely dropped references are safely re-attached so no citations are lost.
+ */
+export function restoreRefTags(text, refTags) {
+  if (!text || !refTags || refTags.length === 0) return text;
+  let result = text;
+  const restoredIndices = new Set();
+
+  // Match flexible variations of <ref data-ref-id="N"/>, <ref data-ref-id="N">...</ref>, etc.
+  result = result.replace(/<ref\b[^>]*\bdata-ref-id\s*=\s*["']?(\d+)["']?[^>]*>(?:[\s\S]*?<\/ref>)?|<ref\b[^>]*\bdata-ref-id\s*=\s*["']?(\d+)["']?[^>]*\/>/gi, (match, id1, id2) => {
+    const rawId = id1 !== undefined ? id1 : id2;
+    const id = parseInt(rawId, 10);
+    if (!isNaN(id) && refTags[id]) {
+      restoredIndices.add(id);
+      return refTags[id].original;
+    }
+    return match;
+  });
+
+  // Fallback 1: check exact placeholder strings
+  for (let i = 0; i < refTags.length; i++) {
+    if (!restoredIndices.has(i)) {
+      const ph = refTags[i].placeholder;
+      if (result.includes(ph)) {
+        result = result.split(ph).join(refTags[i].original);
+        restoredIndices.add(i);
+      }
+    }
+  }
+
+  // Fallback 2: if any ref tags were completely dropped by translation engine, re-attach them
+  const missingRefs = refTags.filter((_, idx) => !restoredIndices.has(idx));
+  if (missingRefs.length > 0) {
+    const reflistMatch = result.match(/(\{\{(?:[Rr]eflist|[Rr]eferences|सन्दर्भ|ଆଧାର|ਹਵਾਲੇ)[^}]*\}\})/);
+    if (reflistMatch && reflistMatch.index !== undefined) {
+      const insertPos = reflistMatch.index;
+      const refsText = missingRefs.map(r => r.original).join(' ') + '\n';
+      result = result.slice(0, insertPos) + refsText + result.slice(insertPos);
+    } else {
+      result = result.trimEnd() + '\n' + missingRefs.map(r => r.original).join(' ');
+    }
+  }
+
+  return result;
 }
 
 /**
