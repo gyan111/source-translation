@@ -1,4 +1,4 @@
-import { query, isDatabaseConnected } from '../config/database.js';
+import { query, isDatabaseConnected, tryReconnect, getDatabaseError } from '../config/database.js';
 
 // In-memory buffer fallback if DB is temporarily unreachable
 const inMemoryEvents = [];
@@ -89,6 +89,11 @@ export const analyticsService = {
    */
   async getStatsSummary() {
     if (!isDatabaseConnected()) {
+      await tryReconnect();
+    }
+
+    if (!isDatabaseConnected()) {
+      const dbError = getDatabaseError ? getDatabaseError() : null;
       // Aggregate in-memory metrics
       const totalEvents = inMemoryEvents.length;
       const publishes = inMemoryEvents.filter(e => e.eventType === 'publish').length;
@@ -122,6 +127,7 @@ export const analyticsService = {
 
       return {
         databaseConnected: false,
+        databaseError: dbError,
         totals: {
           totalEvents,
           publishes,
@@ -248,6 +254,7 @@ export const analyticsService = {
       return {
         databaseConnected: false,
         error: err.message,
+        databaseError: err.message,
         totals: {},
         topContributors: [],
         languageDistribution: [],

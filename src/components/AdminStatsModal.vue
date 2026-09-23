@@ -59,7 +59,12 @@
           <div v-if="!stats.summary?.databaseConnected" class="px-4 py-2.5 bg-amber-950/30 border border-amber-800/40 rounded-xl text-amber-300/90 text-xs flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <span class="material-icons text-sm text-amber-400">info</span>
-              <span>Running in memory fallback mode. Configure MariaDB envvars to persist data across tool restarts.</span>
+              <div>
+                <span>Running in memory fallback mode. Configure MariaDB envvars to persist data across tool restarts.</span>
+                <span v-if="stats.summary?.databaseError" class="block text-[11px] text-amber-400/80 mt-0.5 font-mono">
+                  Diagnostics: {{ stats.summary.databaseError }}
+                </span>
+              </div>
             </div>
             <span class="px-2 py-0.5 bg-amber-900/60 rounded text-[10px] uppercase tracking-wider font-semibold">Memory Mode</span>
           </div>
