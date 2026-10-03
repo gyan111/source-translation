@@ -10,6 +10,7 @@
  */
 
 import axios from 'axios';
+import { CATEGORY_PREFIX_MAP } from './wikitextParser.js';
 
 const REQUEST_TIMEOUT = 30000;
 const CHUNK_SIZE = 4500; // Characters per chunk for APIs with limits
@@ -220,6 +221,9 @@ async function callWithRetry(adapter, text, fromLang, toLang, options) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
+  }
+  if (options && options.throwOnError) {
+    throw lastError || new Error(`Translation retries exhausted for ${fromLang}→${toLang}`);
   }
   console.warn(`All translation retries exhausted for ${fromLang}→${toLang}. Returning original text.`);
   return text;
@@ -585,6 +589,12 @@ export function buildLlmSystemInstruction(fromLang, toLang, options = {}) {
     prompt += `  * For unlinked/missing foreign articles, keep the English target with translated display: [[Original Title|Translated Display]].\n`;
   }
 
+  const targetCategoryPrefix = (toLang && CATEGORY_PREFIX_MAP[toLang]) || 'Category';
+  prompt += `- For [[Category:...]] tags:\n`;
+  prompt += `  * ALWAYS use the target language category prefix [[${targetCategoryPrefix}:...]]. NEVER leave "Category:" in English.\n`;
+  prompt += `  * If a category already has an existing target title (e.g. [[${targetCategoryPrefix}:...]]), preserve it exactly.\n`;
+  prompt += `  * For un-translated categories, translate the category name accurately into ${toSpec.name} using standard ${toSpec.name} Wikipedia category conventions.\n`;
+
   if (toSpec.extra) {
     prompt += `- ${toSpec.extra}\n`;
   }
@@ -614,6 +624,11 @@ export function sanitizeTranslationOutput(text, toLang) {
       .replace(/উপন্যাস/g, 'ᱜᱟᱢᱟᱢ')
       .replace(/হলো/g, 'ᱠᱟᱱᱟ')
       .replace(/[।]/g, '᱾');
+  }
+
+  if (toLang && CATEGORY_PREFIX_MAP[toLang]) {
+    const targetCatPrefix = CATEGORY_PREFIX_MAP[toLang];
+    res = res.replace(/\[\[\s*(?:Category|Kategorie|Catégorie|Categoría|Categoria|Категория)\s*:\s*/gi, `[[${targetCatPrefix}:`);
   }
 
   return res;

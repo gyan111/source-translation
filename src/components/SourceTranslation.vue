@@ -877,6 +877,7 @@
             :sectionTitle="para.sectionTitle"
             :sectionIndex="para.sectionIndex"
             :isHeading="para.isHeading"
+            :isCategories="para.isCategories || false"
             @translate-paragraph="translateParagraph"
             @update-translation="updateTranslation"
             @toggle-reviewed="toggleReviewed"
@@ -2640,6 +2641,7 @@ reviewedCount() {
         sectionTitle: p.sectionTitle,
         sectionLevel: p.sectionLevel,
         isHeading: p.isHeading,
+        isCategories: p.isCategories || false,
       }));
     },
 

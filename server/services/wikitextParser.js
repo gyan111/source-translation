@@ -24,10 +24,28 @@ const COMMENT_RE = /<!--[\s\S]*?-->/g;
 const MAGIC_RE = /__[A-Z]+__/g;
 
 // Category namespace names across languages
-const CATEGORY_PREFIXES = [
-  'Category', 'Kategorie', 'Catégorie', 'Categoría', 'Categoria',
-  'श्रेणी', 'বিষয়শ্রেণী', 'ವರ್ಗ', 'വർഗ്ഗം', 'பகுப்பு', 'వర్గం',
-  'Категория', 'カテゴリ', 'فئة', 'زمرہ',
+export const CATEGORY_PREFIX_MAP = {
+  ar: 'تصنيف', as: 'শ্ৰেণী', bn: 'বিষয়শ্রেণী', bho: 'श्रेणी', br: 'Rummad', ca: 'Categoria',
+  cs: 'Kategorie', cy: 'Categori', da: 'Kategori', de: 'Kategorie', el: 'Κατηγορία', en: 'Category',
+  eo: 'Kategorio', es: 'Categoría', et: 'Kategooria', eu: 'Kategoria', fa: 'رده', fi: 'Luokka',
+  fr: 'Catégorie', ga: 'Catagóir', gl: 'Categoría', gu: 'શ્રેણી', he: 'קטגוריה', hi: 'श्रेणी',
+  hr: 'Kategorija', hu: 'Kategória', hy: '\u053f\u0561\u057f\u0565\u0563\u0578\u0580\u056b\u0561', id: 'Kategori', is: 'Flokkur', it: 'Categoria',
+  ja: 'Category', jv: 'Kategori', ka: '\u10d9\u10d0\u10e2\u10d4\u10d2\u10dd\u10e0\u10d8\u10d0', kn: 'ವರ್ಗ', ko: '분류', ku: 'Kategorî',
+  la: 'Categoria', lt: 'Kategorija', lv: 'Kategorija', mai: 'श्रेणी', ml: 'വർഗ്ഗം', mn: 'Ангилаਲ',
+  mr: 'वर्ग', ms: 'Kategori', my: 'ကဏ္ဍ', ne: 'श्रेणी', nl: 'Categorie', nn: 'Kategori',
+  no: 'Kategori', or: '\u0b36\u0b4d\u0b30\u0b47\u0b23\u0b40', pa: '\u0a38\u0a3c\u0a4d\u0a30\u0a47\u0a23\u0a40', pl: 'Kategoria', ps: 'وېشنيزه', pt: 'Categoria',
+  ro: 'Categorie', ru: 'Категория', sa: 'वर्गः', sat: 'ᱛᱷᱚᱠ', sd: 'زمرو', sk: 'Kategória',
+  sl: 'Kategorija', sq: 'Kategoria', sr: 'Категорија', su: 'Kategori', sv: 'Kategori', sw: 'Jamii',
+  ta: 'பகுப்பு', te: 'వర్గం', th: 'หมวดหมู่', tl: 'Kategorya', tr: 'Kategori', uk: 'Категорія',
+  ur: 'زمرہ', vi: 'Thể loại', yi: 'קאַטעגאָରିע', zh: 'Category',
+};
+
+export const CATEGORY_PREFIXES = [
+  ...new Set([
+    'Category', 'Kategorie', 'Catégorie', 'Categoría', 'Categoria',
+    'Категория', 'カテゴリ', 'فئة', 'زمرہ',
+    ...Object.values(CATEGORY_PREFIX_MAP),
+  ]),
 ];
 
 // File/Image namespace names across languages
@@ -408,7 +426,7 @@ export function extractTemplateNames(segments) {
       const name = withoutComments.split('|')[0].trim();
       return name;
     })
-    .filter(name => name && !name.startsWith('#') && !name.startsWith('{'));
+    .filter(name => name && !name.startsWith('#') && !name.startsWith('{') && !/^(?:defaultsort|displaytitle):/i.test(name));
 }
 
 export const TECHNICAL_TEMPLATES = new Set([
@@ -459,21 +477,6 @@ const PROTECTED_PARAM_NAMES = new Set([
   'latitude', 'longitude', 'coor', 'coord', 'native_name_lang', 'iso_code', 'iso_3166_2', 'lang', 'language_code',
 ]);
 
-export const CATEGORY_PREFIX_MAP = {
-  ar: 'تصنيف', as: 'শ্ৰেণী', bn: 'বিষয়শ্রেণী', bho: 'श्रेणी', br: 'Rummad', ca: 'Categoria',
-  cs: 'Kategorie', cy: 'Categori', da: 'Kategori', de: 'Kategorie', el: 'Κατηγορία', en: 'Category',
-  eo: 'Kategorio', es: 'Categoría', et: 'Kategooria', eu: 'Kategoria', fa: 'رده', fi: 'Luokka',
-  fr: 'Catégorie', ga: 'Catagóir', gl: 'Categoría', gu: 'શ્રેણી', he: 'קטגוריה', hi: 'श्रेणी',
-  hr: 'Kategorija', hu: 'Kategória', hy: '\u053f\u0561\u057f\u0565\u0563\u0578\u0580\u056b\u0561', id: 'Kategori', is: 'Flokkur', it: 'Categoria',
-  ja: 'Category', jv: 'Kategori', ka: '\u10d9\u10d0\u10e2\u10d4\u10d2\u10dd\u10e0\u10d8\u10d0', kn: 'ವರ್ಗ', ko: '분류', ku: 'Kategorî',
-  la: 'Categoria', lt: 'Kategorija', lv: 'Kategorija', mai: 'श्रेणी', ml: 'വർഗ്ഗം', mn: 'Ангилаલ',
-  mr: 'वर्ग', ms: 'Kategori', my: 'ကဏ္ဍ', ne: 'श्रेणी', nl: 'Categorie', nn: 'Kategori',
-  no: 'Kategori', or: '\u0b36\u0b4d\u0b30\u0b47\u0b23\u0b40', pa: '\u0a38\u0a3c\u0a4d\u0a30\u0a47\u0a23\u0a40', pl: 'Kategoria', ps: 'وېشنيزه', pt: 'Categoria',
-  ro: 'Categorie', ru: 'Категория', sa: 'वर्गः', sat: 'ᱛᱷᱚᱠ', sd: 'زمرو', sk: 'Kategória',
-  sl: 'Kategorija', sq: 'Kategoria', sr: 'Категорија', su: 'Kategori', sv: 'Kategori', sw: 'Jamii',
-  ta: 'பகுப்பு', te: 'వర్గం', th: 'หมวดหมู่', tl: 'Kategorya', tr: 'Kategori', uk: 'Категорія',
-  ur: 'زمرہ', vi: 'Thể loại', yi: 'קאַטעגאָריע', zh: 'Category',
-};
 
 export const REFLIST_TEMPLATE_MAP = {
   ar: 'مراجع', bn: 'सूत्र', de: 'Einzelnachweise', en: 'Reflist', es: 'Referencias', fa: 'پانویس',
@@ -482,7 +485,7 @@ export const REFLIST_TEMPLATE_MAP = {
   ru: 'Примечания', ta: 'சான்றுகள்', te: 'మూలాలు', ur: 'حوالہ جات', zh: 'Reflist',
 };
 
-import { normalizeToAsciiDigits, isPureNumericOrDateOrCode } from './numeralConverter.js';
+import { normalizeToAsciiDigits, isPureNumericOrDateOrCode, convertDigitsToScript, DIGIT_MAPS } from './numeralConverter.js';
 
 /**
  * Determines whether a template parameter value represents translatable text.
@@ -871,12 +874,17 @@ export function reassembleWikitext(
       }
 
       case 'template': {
+        const trimmedInner = seg.content.slice(2, -2).trim();
+        if (/^(?:defaultsort|displaytitle):/i.test(trimmedInner)) {
+          parts.push(seg.content.trim());
+          break;
+        }
         try {
           const parsed = parseTemplate(seg.content);
           let translatedName = translatedTemplates[parsed.name] || parsed.name;
           if (translatedName === parsed.name && toLang) {
             const lower = parsed.name.toLowerCase();
-            if (['reflist', 'references', 'reference', 'ref', 'notes', 'refliste', 'ଆଧାର', 'ਹਵਾਲੇ', 'सन्दर्भ'].includes(lower)) {
+            if (['reflist', 'references', 'reference', 'ref', 'notes', 'refliste', 'ଆଧାର', 'ਹਵਾਲେ', 'सन्दर्भ'].includes(lower)) {
               translatedName = REFLIST_TEMPLATE_MAP[toLang] || translatedName;
             }
           }
@@ -935,7 +943,11 @@ export function reassembleWikitext(
           }
         } else {
           // Translate category name text after colon via MT
-          const translatedTargetName = (unresolvedTranslatedTargets && unresolvedTranslatedTargets[cleanTarget]) || cleanTarget;
+          let translatedTargetName = (unresolvedTranslatedTargets && unresolvedTranslatedTargets[cleanTarget]) || cleanTarget;
+          // Convert digits to target script numerals if applicable
+          if (toLang && DIGIT_MAPS[toLang]) {
+            translatedTargetName = convertDigitsToScript(translatedTargetName, toLang);
+          }
           if (seg.display && seg.display.trim()) {
             parts.push(`[[${targetPrefix}:${translatedTargetName.trim()}|${seg.display.trim()}]]`);
           } else {

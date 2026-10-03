@@ -107,6 +107,18 @@ export function splitWikitextWithSections(wikitext) {
         sectionTitle: currentSectionTitle,
         sectionLevel: currentSectionLevel,
         isHeading: true,
+        isCategories: false,
+      });
+    } else if (isCategoryBlock(pText)) {
+      // Standalone category block: advance section so Categories appears as its own section in dropdown
+      currentSectionIndex++;
+      result.push({
+        source: pText,
+        sectionIndex: currentSectionIndex,
+        sectionTitle: 'Categories',
+        sectionLevel: 2,
+        isHeading: false,
+        isCategories: true,
       });
     } else {
       result.push({
@@ -115,11 +127,32 @@ export function splitWikitextWithSections(wikitext) {
         sectionTitle: currentSectionTitle,
         sectionLevel: currentSectionLevel,
         isHeading: false,
+        isCategories: false,
       });
     }
   }
 
   return result;
+}
+
+/**
+ * Checks if a text block consists exclusively of category links and/or defaultsort magic words.
+ */
+export function isCategoryBlock(text) {
+  if (!text || typeof text !== 'string') return false;
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return false;
+  let categoryCount = 0;
+  for (const line of lines) {
+    if (/^\[\[\s*(?:Category|Kategorie|Catégorie|Categoría|Categoria|श्रेणी|विषयশ্রেণী|ವರ್ಗ|വർഗ്ഗം|பகுப்பு|వర్గం|ଶ୍ରେଣୀ|ਸ਼੍ਰେਣੀ|શ્રેણી|ᱛᱷᱚᱠ|تصنيف|زمرہ|Категория|カテゴリ|فئة)\s*:[^\]]+\]\]$/i.test(line)) {
+      categoryCount++;
+    } else if (/^\{\{\s*(?:defaultsort|displaytitle)\s*:[^\}]+\}\}$/i.test(line)) {
+      categoryCount++;
+    } else {
+      return false;
+    }
+  }
+  return categoryCount > 0;
 }
 
 /**

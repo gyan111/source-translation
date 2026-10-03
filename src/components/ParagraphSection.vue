@@ -40,6 +40,14 @@
           <span class="material-icons-round text-[11px]">title</span>
           {{ $t('section.heading') }}
         </span>
+
+        <span
+          v-if="isCategories"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 text-[10px] font-bold border border-purple-200 dark:border-purple-800/60 shadow-2xs"
+        >
+          <span class="material-icons-round text-[11px]">category</span>
+          {{ $t('section.categories') || 'Categories' }}
+        </span>
         
         <!-- Status Badges -->
         <span v-if="status === 'translated' && reviewed" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold border border-emerald-300 dark:border-emerald-800/60 shadow-2xs">
@@ -517,6 +525,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    isCategories: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -710,6 +722,12 @@ export default {
         .replace(/'''''(.+?)'''''/g, '<strong><em>$1</em></strong>')
         .replace(/'''(.+?)'''/g, '<strong>$1</strong>')
         .replace(/''(.+?)''/g, '<em>$1</em>')
+        // DEFAULTSORT & DISPLAYTITLE magic words
+        .replace(/\{\{(?:DEFAULTSORT|defaultsort):([^\}]+)\}\}/gi, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-mono text-[11px] border border-amber-200 dark:border-amber-800/50 my-0.5"><span class="material-icons-round text-xs">sort_by_alpha</span>DEFAULTSORT: $1</span>')
+        // Category links [[Category:...]] or localized e.g. [[ଶ୍ରେଣୀ:...]]
+        .replace(/\[\[(?:Category|Catégorie|Kategorie|Categoria|Categoría|Категория|Kategoria|శ్రేణి|വർഗ്ഗം|শ্রেণী|ଶ୍ରେଣୀ|શ્રેણી|वर्ग|শ্রেণি|വിഭാഗം|থাক|หมวดหมู่|രූපരേഖ|ವರ್ಗ|বিষয়শ্রেণী|تصنيف|رده):([^\]|]+)(?:\|([^\]]+))?\]\]/gi, (m, cat, sort) => {
+          return `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 text-xs font-medium shadow-2xs mr-1.5 my-0.5"><span class="material-icons-round text-xs text-purple-500">folder</span>${cat}${sort ? ' <span class="text-[10px] text-purple-400">(' + sort + ')</span>' : ''}</span>`;
+        })
         // Wikilinks [[Target|Label]] & [[Target]]
         .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '<a href="#" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">$2</a>')
         .replace(/\[\[([^\]]+)\]\]/g, '<a href="#" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">$1</a>')

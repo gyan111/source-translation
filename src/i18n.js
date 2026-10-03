@@ -50,6 +50,7 @@ const messages = {
     section: {
       leadSection: 'Lead Section',
       heading: 'Heading',
+      categories: 'Categories',
       readyToPublish: 'Ready to Publish Section: "{title}"?',
       readyToPublishArticle: 'Ready to Publish to Wikipedia?',
       publishDescription: 'Publish this translated section directly to {lang} Wikipedia without overwriting other sections.',
@@ -936,6 +937,7 @@ const messages = {
     section: {
       leadSection: 'ମୁଖ୍ୟ ଅନୁଭାଗ',
       heading: 'ଶୀର୍ଷକ',
+      categories: 'ଶ୍ରେଣୀ',
       readyToPublish: 'ଅନୁଭାଗ ପ୍ରକାଶ କରିବାକୁ ପ୍ରସ୍ତୁତ: "{title}"?',
       readyToPublishArticle: 'ଉଇକିପିଡ଼ିଆରେ ପ୍ରକାଶ କରିବାକୁ ପ୍ରସ୍ତୁତ କି?',
       publishDescription: 'ଅନ୍ୟ ଅନୁଭାଗକୁ ନ ବଦଳାଇ ସିଧାସଳଖ {lang} ଉଇକିପିଡ଼ିଆରେ ଏହି ଅନୁବାଦିତ ଅନୁଭାଗ ପ୍ରକାଶ କରନ୍ତୁ।',

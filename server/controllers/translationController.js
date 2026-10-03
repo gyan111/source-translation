@@ -172,7 +172,7 @@ export const preview = async (req, res) => {
     const params = new URLSearchParams({
       action: 'parse',
       format: 'json',
-      prop: 'text',
+      prop: 'text|categorieshtml',
       contentmodel: 'wikitext',
       text: text,
       uselang: language,
@@ -189,8 +189,11 @@ export const preview = async (req, res) => {
       }
     );
 
-    if (response.data?.parse?.text?.['*']) {
-      res.json({ html: response.data.parse.text['*'] });
+    if (response.data?.parse) {
+      const textHtml = response.data.parse.text?.['*'] || '';
+      const catHtml = response.data.parse.categorieshtml?.['*'] || '';
+      const combinedHtml = (textHtml + (catHtml ? `\n${catHtml}` : '')).trim();
+      res.json({ html: combinedHtml || '<p class="text-zinc-400 italic">No content rendered.</p>' });
     } else if (response.data?.error) {
       res.status(400).json({
         error: 'MediaWiki Parse Error',

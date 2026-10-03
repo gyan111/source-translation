@@ -154,7 +154,8 @@ export async function translateTemplateNames(templateNames, fromLang, toLang) {
     const translated = translations[prefixed] || prefixed;
     // Strip "Template:" prefix (in any language) from the result
     const colonIdx = translated.indexOf(':');
-    result[templateNames[i]] = colonIdx !== -1 ? translated.slice(colonIdx + 1) : translated;
+    const hasTemplatePrefix = colonIdx !== -1 && /^(?:template|modèle|vorlage|plantilla|modello|шаблон|টেমপ্লেଟ|ढांचा|ଫରମା):/i.test(translated);
+    result[templateNames[i]] = hasTemplatePrefix ? translated.slice(colonIdx + 1) : translated;
   }
 
   return result;
@@ -177,7 +178,19 @@ export async function translateCategories(categoryTitles, fromLang, toLang) {
     return res;
   }
 
-  return translateTitlesViaWikidata(categoryTitles, fromLang, toLang);
+  const normalizedTitles = categoryTitles.map(c => {
+    if (c.includes(':')) return c;
+    return `Category:${c}`;
+  });
+
+  const translations = await translateTitlesViaWikidata(normalizedTitles, fromLang, toLang);
+  const result = {};
+  for (let i = 0; i < categoryTitles.length; i++) {
+    const original = categoryTitles[i];
+    const norm = normalizedTitles[i];
+    result[original] = translations[norm] || translations[original] || original;
+  }
+  return result;
 }
 
 // ──────────────────────────── Internal ────────────────────────────

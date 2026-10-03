@@ -24,7 +24,10 @@ import {
   normalizeWikitextSyntax,
   protectRefTags,
   restoreRefTags,
+  CATEGORY_PREFIX_MAP,
+  CATEGORY_PREFIXES,
 } from './wikitextParser.js';
+import { convertDigitsToScript } from './numeralConverter.js';
 import {
   translateTitlesViaWikidata,
   translateTemplateNames,
@@ -152,8 +155,32 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
       }
     }
 
+    // Pre-substitute exact category translations if available on target wiki
+    const targetCategoryPrefix = (toLang && CATEGORY_PREFIX_MAP[toLang]) || 'Category';
+    const categoryPrefixPattern = CATEGORY_PREFIXES.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+
+    for (const [origCat, transCat] of Object.entries(translatedCategories)) {
+      if (transCat && transCat !== origCat) {
+        const origColonIdx = origCat.indexOf(':');
+        const origClean = origColonIdx !== -1 ? origCat.slice(origColonIdx + 1).trim() : origCat.trim();
+        const escapedClean = origClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const transColonIdx = transCat.indexOf(':');
+        const transClean = transColonIdx !== -1 ? transCat.slice(transColonIdx + 1).trim() : transCat.trim();
+        const fullTransCat = `${targetCategoryPrefix}:${transClean}`;
+
+        preparedWikitext = preparedWikitext.replace(
+          new RegExp(`\\[\\[\\s*(?:${categoryPrefixPattern})\\s*:\\s*${escapedClean}\\s*(\\|[^\\]]+)?\\]\\]`, 'gi'),
+          (m, sortkey) => sortkey ? `[[${fullTransCat}${sortkey}]]` : `[[${fullTransCat}]]`
+        );
+      }
+    }
+
     try {
-      const translatedWikitext = await translateText(preparedWikitext, fromLang, toLang, service, options);
+      const translatedWikitext = await translateText(preparedWikitext, fromLang, toLang, service, { ...options, throwOnError: true });
+      if (!translatedWikitext || translatedWikitext.trim() === preparedWikitext.trim()) {
+        throw new Error('LLM returned identical or empty translation');
+      }
       // Restore original <ref> tags verbatim
       const withRefsRestored = restoreRefTags(translatedWikitext, refTags);
 
@@ -161,8 +188,17 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
       stats.timingMs.total = Date.now() - startTime;
       if (onProgress) onProgress('done', 100);
 
-      const normalizedWikitext = normalizeWikitextSyntax(withRefsRestored);
-      console.log(`[Pipeline/LLM] Completed in ${stats.timingMs.total}ms — links: ${stats.linksTranslated}/${stats.linksFound}, templates: ${stats.templatesTranslated}/${stats.templatesFound}, refs protected: ${refTags.length}`);
+      let normalizedWikitext = normalizeWikitextSyntax(withRefsRestored);
+      // Ensure all remaining category tags use target localized category prefix
+      if (toLang && CATEGORY_PREFIX_MAP[toLang]) {
+        const targetPrefix = CATEGORY_PREFIX_MAP[toLang];
+        normalizedWikitext = normalizedWikitext.replace(
+          new RegExp(`\\[\\[\\s*(?:${categoryPrefixPattern})\\s*:\\s*`, 'gi'),
+          `[[${targetPrefix}:`
+        );
+      }
+
+      console.log(`[Pipeline/LLM] Completed in ${stats.timingMs.total}ms — links: ${stats.linksTranslated}/${stats.linksFound}, categories: ${stats.categoriesTranslated}/${stats.categoriesFound}, templates: ${stats.templatesTranslated}/${stats.templatesFound}, refs protected: ${refTags.length}`);
       return { translatedText: normalizedWikitext, stats };
     } catch (llmErr) {
       console.warn(`[Pipeline/LLM] Direct LLM translation failed: ${llmErr.message}. Falling back to segmented pipeline.`);
@@ -287,7 +323,9 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
 
   // Step 8.5: Translate unresolved link targets and category names (for native red links / missing categories)
   const unresolvedLinkTargets = linkTargets.filter(t => !translatedLinks[t] || translatedLinks[t] === t);
-  const cleanCategoryTargets = categoryTargets.map(c => c.replace(/^(?:Category|Catégorie|ਸ਼੍ਰେਣੀ|श्रेणी|विषयশ্রেণী|వర్గం|تصنيف|Категория):/i, '').trim());
+  const categoryPrefixPattern = CATEGORY_PREFIXES.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const catPrefixRegex = new RegExp(`^(?:${categoryPrefixPattern}):\\s*`, 'i');
+  const cleanCategoryTargets = categoryTargets.map(c => c.replace(catPrefixRegex, '').trim());
   const unresolvedCategoryTargets = cleanCategoryTargets.filter(c => {
     const origWithPrefix = `Category:${c}`;
     const mapped = translatedCategories[origWithPrefix] || translatedCategories[c];
@@ -301,6 +339,39 @@ export async function translateWikitext(wikitext, fromLang, toLang, service, opt
       unresolvedTranslatedTargets = await translateTexts(unresolvedAll, fromLang, toLang, service, options);
     } catch (err) {
       for (const u of unresolvedAll) unresolvedTranslatedTargets[u] = u;
+    }
+
+    // Smart fallback translation for common birth/death year categories if MT failed or returned English
+    for (const u of unresolvedCategoryTargets) {
+      if (!unresolvedTranslatedTargets[u] || unresolvedTranslatedTargets[u] === u) {
+        const birthMatch = u.match(/^(\d{1,4})\s+births$/i);
+        const deathMatch = u.match(/^(\d{1,4})\s+deaths$/i);
+        if (birthMatch) {
+          const yr = birthMatch[1];
+          if (toLang === 'or') {
+            const yrOr = convertDigitsToScript(yr, 'or');
+            unresolvedTranslatedTargets[u] = `${yrOr} ଜନ୍ମ`;
+          } else if (toLang === 'hi' || toLang === 'mr' || toLang === 'ne') {
+            const yrDev = convertDigitsToScript(yr, toLang);
+            unresolvedTranslatedTargets[u] = `${yrDev} जन्म`;
+          } else if (toLang === 'bn' || toLang === 'as') {
+            const yrBn = convertDigitsToScript(yr, toLang);
+            unresolvedTranslatedTargets[u] = `${yrBn}-এ জন্ম`;
+          }
+        } else if (deathMatch) {
+          const yr = deathMatch[1];
+          if (toLang === 'or') {
+            const yrOr = convertDigitsToScript(yr, 'or');
+            unresolvedTranslatedTargets[u] = `${yrOr} ମୃତ୍ୟୁ`;
+          } else if (toLang === 'hi' || toLang === 'mr' || toLang === 'ne') {
+            const yrDev = convertDigitsToScript(yr, toLang);
+            unresolvedTranslatedTargets[u] = `${yrDev} मृत्यु`;
+          } else if (toLang === 'bn' || toLang === 'as') {
+            const yrBn = convertDigitsToScript(yr, toLang);
+            unresolvedTranslatedTargets[u] = `${yrBn}-এ মৃত্যু`;
+          }
+        }
+      }
     }
   }
 

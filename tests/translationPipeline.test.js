@@ -188,6 +188,105 @@ describe('translationPipeline', () => {
     // Verify Apple Music was not translated inside the citation
     expect(translatedText).not.toContain('ᱮᱯᱚᱞ ᱢᱤᱣᱡᱤᱠ');
   });
+
+  it('translates Mitra Bir categories and preserves DEFAULTSORT from English to Odia', async () => {
+    // Mock Wikidata category lookup: "Category:Women Indian independence activists" -> "ଶ୍ରେଣୀ:ଭାରତର ମହିଳା ସ୍ୱାଧୀନତା ସଂଗ୍ରାମୀ"
+    axios.get.mockResolvedValueOnce({
+      data: {
+        entities: {
+          Q1: {
+            sitelinks: {
+              enwiki: { title: 'Category:Women Indian independence activists' },
+              orwiki: { title: 'ଶ୍ରେଣୀ:ଭାରତର ମହିଳା ସ୍ୱାଧୀନତା ସଂଗ୍ରାମୀ' },
+            },
+          },
+        },
+      },
+    });
+
+    // Mock text translation service (e.g. for unresolved category names returning untranslated or error)
+    axios.post.mockResolvedValue({
+      data: {
+        translation: '',
+      },
+    });
+
+    const wikitext = `{{DEFAULTSORT:Bir, Mitra}}
+[[Category:1932 births]]
+[[Category:1978 deaths]]
+[[Category:Women Indian independence activists]]`;
+
+    const { translatedText, stats } = await translateWikitext(wikitext, 'en', 'or', 'mint');
+
+    expect(translatedText).toBeDefined();
+    // Verify DEFAULTSORT is intact, not broken to {{Bir, Mitra}}
+    expect(translatedText).toContain('{{DEFAULTSORT:Bir, Mitra}}');
+    // Verify Wikidata-resolved category
+    expect(translatedText).toContain('[[ଶ୍ରେଣୀ:ଭାରତର ମହିଳା ସ୍ୱାଧୀନତା ସଂଗ୍ରାମୀ]]');
+    // Verify smart fallback for birth & death years with Odia numerals
+    expect(translatedText).toContain('[[ଶ୍ରେଣୀ:୧୯୩୨ ଜନ୍ମ]]');
+    expect(translatedText).toContain('[[ଶ୍ରେଣୀ:୧୯୭୮ ମୃତ୍ୟୁ]]');
+    // Verify no English Category prefix remains
+    expect(translatedText).not.toContain('[[Category:');
+  });
+
+  it('translates categories in LLM mode pre-substituting Wikidata sitelinks and Odia prefix', async () => {
+    // Mock Wikidata category lookup
+    axios.get.mockResolvedValueOnce({
+      data: {
+        entities: {
+          Q1: {
+            sitelinks: {
+              enwiki: { title: 'Category:Women Indian independence activists' },
+              orwiki: { title: 'ଶ୍ରେଣୀ:ଭାରତର ମହିଳା ସ୍ୱାଧୀନତା ସଂଗ୍ରାମୀ' },
+            },
+          },
+        },
+      },
+    });
+
+    // Mock LLM translation
+    axios.post.mockImplementation(async (url, data) => {
+      return {
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: `ମିତ୍ରା ବୀର ଜଣେ ସ୍ୱାଧୀନତା ସଂଗ୍ରାମୀ ଥିଲେ।
+
+{{DEFAULTSORT:Bir, Mitra}}
+[[Category:1932 births]]
+[[Category:1978 deaths]]
+[[ଶ୍ରେଣୀ:ଭାରତର ମହିଳା ସ୍ୱାଧୀନତା ସଂଗ୍ରାମୀ]]`,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      };
+    });
+
+    const wikitext = `Mitra Bir was a freedom fighter.
+
+{{DEFAULTSORT:Bir, Mitra}}
+[[Category:1932 births]]
+[[Category:1978 deaths]]
+[[Category:Women Indian independence activists]]`;
+
+    const { translatedText } = await translateWikitext(wikitext, 'en', 'or', 'gemini', { apiKey: 'fake-key' });
+
+    expect(translatedText).toBeDefined();
+    expect(translatedText).toContain('{{DEFAULTSORT:Bir, Mitra}}');
+    expect(translatedText).toContain('[[ଶ୍ରେଣୀ:ଭାରତର ମହିଳା ସ୍ୱାଧୀନତା ସଂଗ୍ରାମୀ]]');
+    // In LLM mode, post-processing normalizes remaining [[Category:...]] to [[ଶ୍ରେଣୀ:...]]
+    expect(translatedText).toContain('[[ଶ୍ରେଣୀ:1932 births]]');
+    expect(translatedText).toContain('[[ଶ୍ରେଣୀ:1978 deaths]]');
+    expect(translatedText).not.toContain('[[Category:');
+  });
 });
+
 
 
